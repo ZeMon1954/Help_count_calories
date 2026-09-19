@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "AI Fitness & Calorie Tracker",
+    "slug": "ai-fitness-calorie-tracker",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "aifitness",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-notifications",
+      "expo-secure-store",
+      "expo-image-picker"
+    ],
+    "experiments": { "typedRoutes": true },
+    "web": { "bundler": "metro" },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.aifitness"
+    },
+    "android": { "package": "com.example.aifitness" }
+  }
+}
