@@ -1,5 +1,5 @@
 import { Link } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { AuthField } from '@/components/auth/AuthField';
@@ -21,6 +21,10 @@ export default function LoginScreen() {
   const [submitError, setSubmitError] = useState('');
   const [showRegistrationPrompt, setShowRegistrationPrompt] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (__DEV__) console.info('[Diagnostics] Login screen rendered');
+  }, []);
 
   async function submit() {
     if (loading) return;

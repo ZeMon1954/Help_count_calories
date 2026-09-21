@@ -17,11 +17,11 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
 }
 
 export default function ProtectedLayout() {
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const { profile, loading, error, retry } = useProfile();
   const state = resolveProfileRoute({
     authenticated: Boolean(session),
-    loading,
+    loading: authLoading || loading,
     error: Boolean(error),
     onboardingCompleted: profile?.profile?.onboardingCompleted === true,
   });

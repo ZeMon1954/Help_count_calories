@@ -2,7 +2,9 @@ import '../global.css';
 
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 
+import { AppErrorBoundary } from '@/components/system/AppErrorBoundary';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { ProfileProvider } from '@/providers/ProfileProvider';
 import { PwaStatus } from '@/components/web/PwaStatus';
@@ -20,15 +22,24 @@ configureReanimatedLogger({
 configureNotifications();
 
 export default function RootLayout() {
+  useEffect(() => {
+    if (__DEV__) console.info('[Diagnostics] Root layout mounted');
+  }, []);
+
   return (
-    <AuthProvider>
-      <ProfileProvider>
-        <Stack
-          screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
-        />
-        <PwaStatus />
-        <StatusBar style="dark" />
-      </ProfileProvider>
-    </AuthProvider>
+    <AppErrorBoundary>
+      <AuthProvider>
+        <ProfileProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              animation: 'slide_from_right',
+            }}
+          />
+          <PwaStatus />
+          <StatusBar style="dark" />
+        </ProfileProvider>
+      </AuthProvider>
+    </AppErrorBoundary>
   );
 }

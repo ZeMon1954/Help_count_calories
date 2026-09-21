@@ -22,10 +22,15 @@ export function AuthScaffold({
   footer,
   children,
 }: AuthScaffoldProps) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(20)).current;
+  const fadeAnim = useRef(
+    new Animated.Value(Platform.OS === 'web' ? 1 : 0),
+  ).current;
+  const translateY = useRef(
+    new Animated.Value(Platform.OS === 'web' ? 0 : 20),
+  ).current;
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,

@@ -50,6 +50,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(true);
   const [recoveryMode, setRecoveryMode] = useState(false);
 
+  useEffect(() => {
+    if (__DEV__) console.info('[Diagnostics] AuthProvider initialized');
+  }, []);
+
   const handleAuthLink = useCallback(async (url: string) => {
     const client = requireSupabase();
     const params = getRecoveryParams(url);
@@ -78,12 +82,24 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const client = requireSupabase();
     let active = true;
 
-    void client.auth.getSession().then(({ data, error }) => {
-      if (!active) return;
-      if (error) console.warn('[Auth] Unable to restore session');
-      setSession(data.session ?? null);
-      setLoading(false);
-    });
+    void client.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) console.warn('[Auth] Unable to restore session');
+        setSession(data.session ?? null);
+        setLoading(false);
+        if (__DEV__)
+          console.info(
+            `[Diagnostics] Supabase session restored: ${data.session ? 'authenticated' : 'anonymous'}`,
+          );
+      })
+      .catch(() => {
+        if (!active) return;
+        console.warn('[Auth] Unable to restore session');
+        setSession(null);
+        setLoading(false);
+      });
 
     const { data: subscription } = client.auth.onAuthStateChange(
       (event, nextSession) => {

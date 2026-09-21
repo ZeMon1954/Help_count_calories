@@ -1,4 +1,5 @@
 import { Redirect } from 'expo-router';
+import { useEffect } from 'react';
 
 import { useAuth } from '@/providers/AuthProvider';
 import { ProfileStateScreen } from '@/components/profile/ProfileStateScreen';
@@ -6,14 +7,17 @@ import { useProfile } from '@/providers/ProfileProvider';
 import { resolveProfileRoute } from '@/utils/profile-routing';
 
 export default function IndexScreen() {
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const { profile, loading, error, retry } = useProfile();
   const state = resolveProfileRoute({
     authenticated: Boolean(session),
-    loading,
+    loading: authLoading || loading,
     error: Boolean(error),
     onboardingCompleted: profile?.profile?.onboardingCompleted === true,
   });
+  useEffect(() => {
+    if (__DEV__) console.info(`[Diagnostics] Initial route selected: ${state}`);
+  }, [state]);
   if (state === 'login') return <Redirect href="/login" />;
   if (state === 'loading') return <ProfileStateScreen />;
   if (state === 'error')

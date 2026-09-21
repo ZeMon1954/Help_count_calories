@@ -1,6 +1,6 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 import { useEffect, useRef } from 'react';
-import { Animated, ScrollView, Text, View } from 'react-native';
+import { Animated, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface ScreenProps extends PropsWithChildren {
@@ -17,10 +17,15 @@ export function Screen({
   scroll = true,
   children,
 }: ScreenProps) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(20)).current;
+  const fadeAnim = useRef(
+    new Animated.Value(Platform.OS === 'web' ? 1 : 0),
+  ).current;
+  const translateY = useRef(
+    new Animated.Value(Platform.OS === 'web' ? 0 : 20),
+  ).current;
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,

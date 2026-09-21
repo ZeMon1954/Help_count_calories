@@ -15,6 +15,18 @@ test('logged-out users route to login', () => {
   );
 });
 
+test('authentication initialization remains on loading before redirecting', () => {
+  assert.equal(
+    resolveProfileRoute({
+      authenticated: false,
+      loading: true,
+      error: false,
+      onboardingCompleted: false,
+    }),
+    'loading',
+  );
+});
+
 test('incomplete onboarding routes to onboarding instead of Home', () => {
   assert.equal(
     resolveProfileRoute({

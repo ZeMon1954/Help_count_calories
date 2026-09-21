@@ -7,8 +7,8 @@ export function resolveProfileRoute(input: {
   error: boolean;
   onboardingCompleted: boolean;
 }): ProfileRouteState {
-  if (!input.authenticated) return 'login';
   if (input.loading) return 'loading';
+  if (!input.authenticated) return 'login';
   if (input.error) return 'error';
   return input.onboardingCompleted ? 'home' : 'onboarding';
 }
