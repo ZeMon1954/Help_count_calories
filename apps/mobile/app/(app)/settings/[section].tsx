@@ -18,9 +18,18 @@ import {
   type Units,
 } from '@/services/api/settings';
 import { syncLocalReminders } from '@/services/reminders';
+import type {
+  ActivityLevel,
+  Equipment,
+  ExperienceLevel,
+  GoalType,
+  ProfileUpdateInput,
+  TrainingLocation,
+} from '@/services/api/profile';
 
 const titles: Record<string, string> = {
-  goal: 'เป้าหมายโภชนาการ', workout: 'ความต้องการในการฝึก',
+  personal: 'ข้อมูลส่วนตัว',
+  goal: 'เป้าหมายโภชนาการ',
   reminders: 'การแจ้งเตือน', units: 'หน่วยวัด',
 };
 
@@ -29,7 +38,7 @@ const numeric = (value: string) => Number(value.trim());
 export default function SettingsScreen() {
   const { section = '' } = useLocalSearchParams<{ section: string }>();
   const { session } = useAuth();
-  const { profile } = useProfile();
+  const { profile, updateProfile } = useProfile();
   const [data, setData] = useState<SettingsSnapshot | null>(null);
   const [targets, setTargets] = useState({ calories: '', protein_g: '', carbs_g: '', fat_g: '' });
   const [loading, setLoading] = useState(true);
@@ -38,6 +47,29 @@ export default function SettingsScreen() {
   const [message, setMessage] = useState('');
   const [newReminderTitle, setNewReminderTitle] = useState('บันทึกมื้ออาหาร');
   const [newReminderTime, setNewReminderTime] = useState('12:00');
+  const [profileForm, setProfileForm] = useState({
+    displayName: '', birthDate: '', heightCm: '',
+    activityLevel: 'sedentary' as ActivityLevel,
+    goalType: 'maintain' as GoalType, workoutDays: '3',
+    trainingLocation: 'home' as TrainingLocation,
+    experienceLevel: 'beginner' as ExperienceLevel,
+    availableEquipment: ['bodyweight'] as Equipment[],
+  });
+
+  useEffect(() => {
+    if (!profile?.profile) return;
+    setProfileForm({
+      displayName: profile.profile.displayName ?? '',
+      birthDate: profile.profile.birthDate ?? '',
+      heightCm: profile.profile.heightCm?.toString() ?? '',
+      activityLevel: profile.profile.activityLevel ?? 'sedentary',
+      goalType: profile.currentGoal?.goalType ?? 'maintain',
+      workoutDays: profile.currentGoal?.workoutDays?.toString() ?? '3',
+      trainingLocation: profile.workoutPreferences?.trainingLocation ?? 'home',
+      experienceLevel: profile.workoutPreferences?.experienceLevel ?? 'beginner',
+      availableEquipment: profile.workoutPreferences?.availableEquipment ?? [],
+    });
+  }, [profile]);
 
   const load = useCallback(async () => {
     if (!session?.access_token) return;
@@ -77,6 +109,44 @@ export default function SettingsScreen() {
     if (!session?.access_token) return;
     await run(() => saveUnits(session.access_token, units), 'บันทึกหน่วยวัดแล้ว');
   }
+
+  async function saveProfileForm(success: string) {
+    const heightCm = profileForm.heightCm.trim()
+      ? Number(profileForm.heightCm)
+      : null;
+    const workoutDays = Number(profileForm.workoutDays);
+    if (!profileForm.displayName.trim() ||
+      (profileForm.birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(profileForm.birthDate)) ||
+      (heightCm !== null && (!Number.isFinite(heightCm) || heightCm <= 0 || heightCm > 300)) ||
+      !Number.isInteger(workoutDays) || workoutDays < 0 || workoutDays > 7) {
+      setError('กรุณาตรวจสอบชื่อ วันเกิด ส่วนสูง และจำนวนวันฝึก');
+      return;
+    }
+    const input: ProfileUpdateInput = {
+      displayName: profileForm.displayName.trim(),
+      birthDate: profileForm.birthDate || null,
+      heightCm,
+      activityLevel: profileForm.activityLevel,
+      goalType: profileForm.goalType,
+      workoutDays,
+      trainingLocation: profileForm.trainingLocation,
+      experienceLevel: profileForm.experienceLevel,
+      availableEquipment: profileForm.availableEquipment,
+    };
+    await run(() => updateProfile(input), success);
+  }
+
+  const choices = <T extends string>(
+    values: readonly { value: T; label: string }[],
+    selected: T,
+    onSelect: (value: T) => void,
+  ) => values.map((item) => (
+    <Pressable key={item.value} className="min-h-12 flex-row items-center"
+      disabled={saving} onPress={() => onSelect(item.value)}>
+      <View className={`mr-3 h-5 w-5 rounded-full border-2 ${selected === item.value ? 'border-[6px] border-emerald-600' : 'border-slate-300'}`} />
+      <Text className="text-slate-800">{item.label}</Text>
+    </Pressable>
+  ));
 
   async function saveTargets() {
     if (!session?.access_token) return;
@@ -124,9 +194,29 @@ export default function SettingsScreen() {
         <Text className="font-semibold text-emerald-700">‹ กลับ</Text>
       </Pressable>
       {loading ? <Card><ActivityIndicator color="#059669" /></Card> : null}
+      {!loading && section === 'personal' ? <>
+        <Card><View className="gap-3">
+          <Text className="text-sm font-medium text-slate-700">ชื่อที่แสดง</Text>
+          <TextInput className="min-h-12 rounded-xl border border-slate-300 px-3 text-slate-900" value={profileForm.displayName} onChangeText={(displayName) => setProfileForm((old) => ({ ...old, displayName }))} />
+          <Text className="text-sm font-medium text-slate-700">วันเกิด (YYYY-MM-DD)</Text>
+          <TextInput className="min-h-12 rounded-xl border border-slate-300 px-3 text-slate-900" value={profileForm.birthDate} keyboardType="numbers-and-punctuation" onChangeText={(birthDate) => setProfileForm((old) => ({ ...old, birthDate }))} />
+          <Text className="text-sm font-medium text-slate-700">ส่วนสูง (ซม.)</Text>
+          <TextInput className="min-h-12 rounded-xl border border-slate-300 px-3 text-slate-900" value={profileForm.heightCm} keyboardType="decimal-pad" onChangeText={(heightCm) => setProfileForm((old) => ({ ...old, heightCm }))} />
+          <Text className="font-semibold text-slate-900">ระดับกิจกรรม</Text>
+          {choices([
+            { value: 'sedentary', label: 'ไม่ค่อยเคลื่อนไหว' },
+            { value: 'lightly_active', label: 'เคลื่อนไหวเล็กน้อย' },
+            { value: 'moderately_active', label: 'เคลื่อนไหวปานกลาง' },
+            { value: 'very_active', label: 'เคลื่อนไหวมาก' },
+          ] as const, profileForm.activityLevel, (activityLevel) => setProfileForm((old) => ({ ...old, activityLevel })))}
+        </View></Card>
+        <ActionButton label={saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูลส่วนตัว'} disabled={saving} onPress={() => void saveProfileForm('บันทึกข้อมูลส่วนตัวแล้ว')} />
+      </> : null}
       {!loading && section === 'goal' ? <>
-        <Card><Text className="text-sm text-slate-500">เป้าหมายหลักปัจจุบัน</Text>
-          <Text className="mt-1 text-lg font-bold text-slate-950">{profile?.currentGoal?.goalType ?? 'ไม่ระบุ'}</Text></Card>
+        <Card><Text className="font-semibold text-slate-900">เป้าหมายหลัก</Text>
+          {choices([{ value: 'lose_fat', label: 'ลดไขมัน' }, { value: 'build_muscle', label: 'เพิ่มกล้ามเนื้อ' }, { value: 'maintain', label: 'รักษาน้ำหนัก' }] as const, profileForm.goalType, (goalType) => setProfileForm((old) => ({ ...old, goalType })))}
+          <ActionButton label="บันทึกเป้าหมายหลัก" disabled={saving} onPress={() => void saveProfileForm('บันทึกเป้าหมายหลักแล้ว')} />
+        </Card>
         <Card><View className="gap-3">{input('calories', 'พลังงานต่อวัน', 'kcal')}{input('protein_g', 'โปรตีน', 'g')}{input('carbs_g', 'คาร์โบไฮเดรต', 'g')}{input('fat_g', 'ไขมัน', 'g')}</View></Card>
         <ActionButton label={saving ? 'กำลังบันทึก...' : 'บันทึกเป้าหมาย'} disabled={saving} onPress={() => void saveTargets()} />
       </> : null}
@@ -157,7 +247,6 @@ export default function SettingsScreen() {
         <ActionButton label="เพิ่มการแจ้งเตือนทุกวัน" disabled={saving} onPress={() => void addReminder()} />
         <Text className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">เวลาแจ้งเตือนบันทึกในบัญชีและซิงก์เป็น Local Notification บนอุปกรณ์นี้เมื่ออนุญาต Notifications</Text>
       </> : null}
-      {!loading && section === 'workout' ? <Card><Text className="font-semibold text-slate-900">ค่าการฝึกที่บันทึกไว้</Text><Text className="mt-2 text-slate-600">สถานที่: {profile?.workoutPreferences?.trainingLocation ?? '-'}</Text><Text className="text-slate-600">ระดับ: {profile?.workoutPreferences?.experienceLevel ?? '-'}</Text><Text className="mt-3 text-sm text-amber-700">ฟิลด์นี้ยังไม่มี endpoint สำหรับแก้ไข จึงแสดงแบบอ่านอย่างเดียวเพื่อไม่เขียนทับข้อมูลเดิม</Text></Card> : null}
       {error ? <Text className="rounded-xl bg-red-50 p-3 text-red-700">{error}</Text> : null}
       {message ? <Text className="rounded-xl bg-emerald-50 p-3 text-emerald-700">{message}</Text> : null}
       {error ? <ActionButton label="ลองโหลดใหม่" variant="secondary" onPress={() => void load()} /> : null}

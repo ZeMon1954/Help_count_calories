@@ -16,13 +16,19 @@ export const aiFoodItemSchema = z
 export const aiFoodAnalysisSchema = z
   .object({
     is_food: z.boolean(),
-    food_name: z.string().trim().min(1).max(160),
+    food_name: z.string().trim().max(160),
     items: z.array(aiFoodItemSchema).max(12),
     confidence: z.enum(['low', 'medium', 'high']),
     warnings: z.array(z.string().trim().min(1).max(300)).max(8),
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.is_food && value.food_name.length === 0)
+      context.addIssue({
+        code: 'custom',
+        path: ['food_name'],
+        message: 'A food image must have a food name',
+      });
     if (value.is_food && value.items.length === 0)
       context.addIssue({
         code: 'custom',

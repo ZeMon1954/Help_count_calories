@@ -1,8 +1,9 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Pressable, Text, TextInput, View } from 'react-native';
+import { LineChart, ProgressChart } from 'react-native-chart-kit';
 
-import { ActionButton, Card, EmptyState, ProgressBar, SectionHeader } from '@/components/ui/Kit';
+import { ActionButton, Card, EmptyState, SectionHeader } from '@/components/ui/Kit';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/providers/AuthProvider';
 import { fetchProgress, saveWeight, type ProgressSnapshot } from '@/services/api/progress';
@@ -52,11 +53,8 @@ export default function ProgressScreen() {
   }
 
   const weights = data?.weightHistory ?? [];
-  const min = weights.length ? Math.min(...weights.map((item) => item.weightKg)) : 0;
-  const max = weights.length ? Math.max(...weights.map((item) => item.weightKg)) : 0;
-
   return (
-    <Screen title="ความคืบหน้า" subtitle="น้ำหนัก โภชนาการ และการฝึกจากข้อมูลจริง">
+    <Screen title="ความคืบหน้า" subtitle="น้ำหนักและโภชนาการจากข้อมูลจริง">
       <View className="flex-row gap-2">
         {([7, 30, 90] as const).map((value) => (
           <Pressable
@@ -100,20 +98,28 @@ export default function ProgressScreen() {
           <SectionHeader title="น้ำหนัก" />
           {weights.length ? (
             <Card>
-              <View className="flex-row items-end justify-between gap-2" style={{ height: 180 }}>
-                {weights.slice(-8).map((item) => {
-                  const height = 55 + ((item.weightKg - min) / Math.max(0.1, max - min)) * 90;
-                  return (
-                    <View key={item.id} className="flex-1 items-center justify-end gap-2">
-                      <Text className="text-xs font-semibold text-slate-600">{item.weightKg}</Text>
-                      <View className="w-full rounded-t-lg bg-emerald-500" style={{ height }} />
-                      <Text className="text-[10px] text-slate-400">
-                        {new Date(item.recordedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
+              <LineChart
+                data={{
+                  labels: weights.slice(-6).map(w => new Date(w.recordedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })),
+                  datasets: [{ data: weights.slice(-6).map(w => w.weightKg) }]
+                }}
+                width={Dimensions.get('window').width - 72} // from padding
+                height={220}
+                yAxisSuffix=" kg"
+                yAxisInterval={1}
+                chartConfig={{
+                  backgroundColor: '#ffffff',
+                  backgroundGradientFrom: '#ffffff',
+                  backgroundGradientTo: '#ffffff',
+                  decimalPlaces: 1,
+                  color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
+                  style: { borderRadius: 16 },
+                  propsForDots: { r: '6', strokeWidth: '2', stroke: '#059669' }
+                }}
+                bezier
+                style={{ marginVertical: 8, borderRadius: 16, paddingRight: 32 }}
+              />
             </Card>
           ) : (
             <EmptyState title="ยังไม่มีข้อมูลน้ำหนัก" description="เพิ่มน้ำหนักรายการแรกได้จากช่องด้านบน" />
@@ -124,32 +130,33 @@ export default function ProgressScreen() {
             {data?.calorieAdherence.percentage === null ? (
               <Text className="text-slate-500">ยังไม่มีเป้าหมายแคลอรีหรือข้อมูลอาหารเพียงพอ</Text>
             ) : (
-              <>
-                <Text className="text-3xl font-bold text-slate-950">
-                  {data?.calorieAdherence.percentage}%
-                </Text>
-                <Text className="mt-1 text-sm text-slate-500">
-                  อยู่ในช่วง ±10% ของเป้าหมาย {data?.calorieAdherence.daysWithinTarget}/
-                  {data?.calorieAdherence.daysLogged} วันที่บันทึก
-                </Text>
-                <View className="mt-4"><ProgressBar value={data?.calorieAdherence.percentage ?? 0} /></View>
-              </>
+              <View className="flex-row items-center gap-4">
+                <ProgressChart
+                  data={[ (data?.calorieAdherence.percentage ?? 0) / 100 ]}
+                  width={100}
+                  height={100}
+                  strokeWidth={12}
+                  radius={40}
+                  chartConfig={{
+                    backgroundGradientFrom: '#ffffff',
+                    backgroundGradientTo: '#ffffff',
+                    color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+                  }}
+                  hideLegend={true}
+                />
+                <View className="flex-1">
+                  <Text className="text-3xl font-bold text-slate-950">
+                    {data?.calorieAdherence.percentage}%
+                  </Text>
+                  <Text className="mt-1 text-sm text-slate-500">
+                    อยู่ในช่วง ±10% ของเป้าหมาย {data?.calorieAdherence.daysWithinTarget}/
+                    {data?.calorieAdherence.daysLogged} วันที่บันทึก
+                  </Text>
+                </View>
+              </View>
             )}
           </Card>
 
-          <SectionHeader title="ประวัติการฝึก" />
-          {data?.workoutHistory.length ? (
-            <Card>
-              {data.workoutHistory.map((item) => (
-                <View key={item.id} className="flex-row justify-between border-b border-slate-100 py-3 last:border-b-0">
-                  <View><Text className="font-semibold text-slate-900">{item.title}</Text><Text className="mt-1 text-sm text-slate-500">{new Date(item.startedAt).toLocaleDateString('th-TH')}</Text></View>
-                  <Text className="text-slate-600">{item.durationMinutes ?? '-'} นาที</Text>
-                </View>
-              ))}
-            </Card>
-          ) : (
-            <EmptyState title="ยังไม่มีประวัติการฝึก" description="เซสชันที่กดจบแล้วจะแสดงที่นี่" />
-          )}
         </>
       ) : null}
     </Screen>

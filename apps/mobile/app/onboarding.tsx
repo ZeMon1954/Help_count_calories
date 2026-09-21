@@ -1,4 +1,4 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -188,7 +188,8 @@ export default function OnboardingScreen() {
         experienceLevel: experience,
         availableEquipment: equipment,
       });
-      router.replace('/home');
+      // No navigation here: the saved profile flips onboardingCompleted, and
+      // the <Redirect href="/home" /> guard above takes over.
     } catch {
       setFormError('บันทึกข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง');
     } finally {

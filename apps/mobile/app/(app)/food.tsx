@@ -116,31 +116,32 @@ export default function FoodDiaryScreen() {
     } catch {
       setError('แก้ไขปริมาณอาหารไม่สำเร็จ กรุณาลองใหม่');
     } finally {
+
       setUpdatingId('');
     }
   }
 
   return (
     <Screen title="บันทึกอาหาร" subtitle="ข้อมูลจริงจาก Food Diary ของคุณ">
-      <View className="flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-2">
+      <View className="flex-row items-center justify-between rounded-3xl border border-slate-100 bg-white p-3 shadow-sm shadow-slate-200/50">
         <Pressable
           accessibilityRole="button"
-          className="min-h-11 min-w-11 items-center justify-center rounded-xl"
+          className="min-h-12 min-w-12 items-center justify-center rounded-2xl bg-slate-50 active:bg-slate-100"
           onPress={() => setSelectedDate((date) => shiftDate(date, -1))}
         >
-          <Text className="text-xl text-slate-700">‹</Text>
+          <Text className="text-xl font-bold text-slate-700">‹</Text>
         </Pressable>
         <Pressable onPress={() => setSelectedDate(new Date())}>
-          <Text className="font-semibold text-slate-900">
+          <Text className="text-lg font-bold text-slate-900">
             {dateLabel(selectedDate)}
           </Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          className="min-h-11 min-w-11 items-center justify-center rounded-xl"
+          className="min-h-12 min-w-12 items-center justify-center rounded-2xl bg-slate-50 active:bg-slate-100"
           onPress={() => setSelectedDate((date) => shiftDate(date, 1))}
         >
-          <Text className="text-xl text-slate-700">›</Text>
+          <Text className="text-xl font-bold text-slate-700">›</Text>
         </Pressable>
       </View>
 
@@ -181,8 +182,8 @@ export default function FoodDiaryScreen() {
                         })
                       }
                     >
-                      <Text className="font-semibold text-emerald-700">
-                        + เลือกอาหาร
+                      <Text className="text-sm font-bold text-primary-600 active:text-primary-800">
+                        + เพิ่ม
                       </Text>
                     </Pressable>
                   }
@@ -265,7 +266,7 @@ export default function FoodDiaryScreen() {
           {!logs.some((log) => log.items.length) ? (
             <EmptyState
               title="ยังไม่มีบันทึกในวันนี้"
-              description="ฐานข้อมูลของวันที่เลือกยังไม่มีรายการ การเพิ่มลงไดอารีรอ atomic RPC"
+              description="ค้นหาอาหารหรือสร้างอาหารส่วนตัว แล้วเพิ่มลงในมื้อที่ต้องการได้ทันที"
             />
           ) : null}
 
@@ -322,10 +323,10 @@ export default function FoodDiaryScreen() {
 
       <Pressable
         accessibilityRole="button"
-        className="min-h-14 items-center justify-center rounded-2xl bg-emerald-600 px-5"
+        className="min-h-[56px] items-center justify-center rounded-2xl bg-primary-600 px-5 shadow-sm active:bg-primary-700 active:scale-[0.98]"
         onPress={() => router.push('/add-food')}
       >
-        <Text className="text-base font-bold text-white">ค้นหาอาหาร</Text>
+        <Text className="text-base font-bold tracking-wide text-white">ค้นหาอาหาร</Text>
       </Pressable>
     </Screen>
   );

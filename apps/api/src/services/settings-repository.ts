@@ -1,6 +1,6 @@
 import type { Env } from '../config/env.js';
 
-export interface ReminderRecord { id:string; type:'meal'|'workout'|'weight'; title:string; time:string; days_of_week:number[]; enabled:boolean }
+export interface ReminderRecord { id:string; type:'meal'|'weight'; title:string; time:string; days_of_week:number[]; enabled:boolean }
 export interface SettingsSnapshot { units:'metric'|'imperial'; targets:{calories:number|null;protein_g:number|null;carbs_g:number|null;fat_g:number|null}; reminders:ReminderRecord[] }
 export interface SettingsRepository {
   get(userId:string, token:string):Promise<SettingsSnapshot>;

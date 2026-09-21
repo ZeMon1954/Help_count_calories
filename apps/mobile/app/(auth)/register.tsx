@@ -43,13 +43,14 @@ export default function RegisterScreen() {
     setSubmitError('');
     try {
       const result = await signUp(email, password);
+      // Only navigate while no session exists. When sign-up returns a session,
+      // (auth)/_layout renders its <Redirect> and unmounts this Stack, so
+      // navigating here would run without a navigation context.
       if (result.requiresEmailVerification) {
         router.replace({
           pathname: '/(auth)/verify-email',
           params: { email: email.trim() },
         });
-      } else {
-        router.replace('/home');
       }
     } catch (error) {
       setSubmitError(getThaiAuthError(error));
@@ -65,7 +66,7 @@ export default function RegisterScreen() {
       footer={
         <Text className="text-slate-600">
           มีบัญชีแล้ว?{' '}
-          <Link className="font-semibold text-emerald-700" href="/(auth)/login">
+          <Link className="font-bold text-primary-600 active:text-primary-800" href="/(auth)/login">
             เข้าสู่ระบบ
           </Link>
         </Text>

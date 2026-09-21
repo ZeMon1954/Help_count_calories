@@ -8,7 +8,7 @@ export const nutritionTargetsSchema = z.object({
   fat_g: z.number().min(0).max(1_000),
 }).strict();
 export const reminderSchema = z.object({
-  type: z.enum(['meal', 'workout', 'weight']),
+  type: z.enum(['meal', 'weight']),
   title: z.string().trim().min(1).max(120),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   days_of_week: z.array(z.number().int().min(1).max(7)).min(1),

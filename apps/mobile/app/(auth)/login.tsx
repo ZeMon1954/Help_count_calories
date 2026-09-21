@@ -1,4 +1,4 @@
-import { Link, router } from 'expo-router';
+import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
@@ -39,8 +39,10 @@ export default function LoginScreen() {
     setSubmitError('');
     setShowRegistrationPrompt(false);
     try {
+      // No navigation here: setting the session makes (auth)/_layout render its
+      // <Redirect>, which unmounts this Stack. Navigating afterwards would run
+      // without a navigation context.
       await signIn(email, password);
-      router.replace('/home');
     } catch (error) {
       setSubmitError(getThaiAuthError(error));
       setShowRegistrationPrompt(isInvalidLoginCredentials(error));
@@ -57,7 +59,7 @@ export default function LoginScreen() {
         <Text className="text-slate-600">
           ยังไม่มีบัญชี?{' '}
           <Link
-            className="font-semibold text-emerald-700"
+            className="font-bold text-primary-600 active:text-primary-800"
             href="/(auth)/register"
           >
             สมัครสมาชิก
@@ -87,7 +89,7 @@ export default function LoginScreen() {
         placeholder="รหัสผ่าน"
       />
       <Link
-        className="self-end font-medium text-emerald-700"
+        className="self-end font-bold text-primary-600 active:text-primary-800"
         href="/(auth)/forgot-password"
       >
         ลืมรหัสผ่าน?
@@ -97,7 +99,7 @@ export default function LoginScreen() {
           <Text className="text-red-700">{submitError}</Text>
           {showRegistrationPrompt ? (
             <Link
-              className="font-semibold text-emerald-700"
+              className="font-bold text-primary-600 active:text-primary-800"
               href="/(auth)/register"
             >
               ยังไม่มีบัญชี? สมัครสมาชิกก่อนเข้าสู่ระบบ

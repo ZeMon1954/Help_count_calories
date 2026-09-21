@@ -5,7 +5,12 @@ import Fastify from 'fastify';
 
 import { loadEnv, type Env } from './config/env.js';
 import { authPlugin, type VerifyAccessToken } from './plugins/auth.js';
-import { onboardingSchema } from './schemas/profile.js';
+import { onboardingSchema, profileUpdateSchema } from './schemas/profile.js';
+import { nutritionAnalysisSchema } from './schemas/nutrition-analysis.js';
+import {
+  createNutritionAnalysisService,
+  type NutritionAnalysisService,
+} from './services/nutrition-analysis-service.js';
 import {
   createFoodAnalysisService,
   FoodAnalysisError,
@@ -36,19 +41,6 @@ import {
   type DatabaseHealthResult,
 } from './services/database-health.js';
 import {
-  finishWorkoutSessionSchema,
-  saveWorkoutSetSchema,
-  startWorkoutSessionSchema,
-  workoutHistoryQuerySchema,
-  workoutSessionParamsSchema,
-  workoutSetParamsSchema,
-} from './schemas/workout.js';
-import {
-  createWorkoutRepository,
-  type WorkoutRepository,
-  WorkoutRepositoryError,
-} from './services/workout-repository.js';
-import {
   createMeasurementSchema,
   progressQuerySchema,
 } from './schemas/progress.js';
@@ -57,8 +49,29 @@ import {
   type ProgressRepository,
   ProgressRepositoryError,
 } from './services/progress-repository.js';
-import { nutritionTargetsSchema, reminderParamsSchema, reminderSchema, unitsSchema } from './schemas/settings.js';
-import { createSettingsRepository, type SettingsRepository, SettingsRepositoryError } from './services/settings-repository.js';
+import {
+  nutritionTargetsSchema,
+  reminderParamsSchema,
+  reminderSchema,
+  unitsSchema,
+} from './schemas/settings.js';
+import {
+  createSettingsRepository,
+  type SettingsRepository,
+  SettingsRepositoryError,
+} from './services/settings-repository.js';
+import {
+  activityListQuerySchema,
+  activityParamsSchema,
+  appendActivityPointsSchema,
+  createActivitySchema,
+  updateActivityStatusSchema,
+} from './schemas/activity.js';
+import {
+  ActivityRepositoryError,
+  createActivityRepository,
+  type ActivityRepository,
+} from './services/activity-repository.js';
 
 interface AppDependencies {
   checkDatabase?: (env: Env) => Promise<DatabaseHealthResult>;
@@ -66,9 +79,10 @@ interface AppDependencies {
   profileRepository?: ProfileRepository;
   foodRepository?: FoodRepository;
   foodAnalysisService?: FoodAnalysisService;
-  workoutRepository?: WorkoutRepository;
   progressRepository?: ProgressRepository;
   settingsRepository?: SettingsRepository;
+  activityRepository?: ActivityRepository;
+  nutritionAnalysisService?: NutritionAnalysisService;
 }
 
 const FOOD_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
@@ -87,11 +101,14 @@ export async function buildApp(
     dependencies.foodRepository ?? createFoodRepository(env);
   const foodAnalysisService =
     dependencies.foodAnalysisService ?? createFoodAnalysisService(env);
-  const workoutRepository =
-    dependencies.workoutRepository ?? createWorkoutRepository(env);
   const progressRepository =
     dependencies.progressRepository ?? createProgressRepository(env);
-  const settingsRepository = dependencies.settingsRepository ?? createSettingsRepository(env);
+  const settingsRepository =
+    dependencies.settingsRepository ?? createSettingsRepository(env);
+  const activityRepository =
+    dependencies.activityRepository ?? createActivityRepository(env);
+  const nutritionAnalysisService =
+    dependencies.nutritionAnalysisService ?? createNutritionAnalysisService(env);
   const analysisRequests = new Map<string, number[]>();
 
   await app.register(sensible);
@@ -107,6 +124,146 @@ export async function buildApp(
   });
 
   app.get('/api/health', async () => ({ status: 'ok' as const }));
+
+  app.post(
+    '/api/nutrition/analyze',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const parsed = nutritionAnalysisSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Invalid nutrition analysis data',
+        });
+      }
+      return nutritionAnalysisService.analyze(parsed.data);
+    },
+  );
+
+  app.get(
+    '/api/activities',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const parsed = activityListQuerySchema.safeParse(request.query);
+      if (!parsed.success)
+        return reply.badRequest('Invalid activity history parameters');
+      try {
+        return {
+          items: await activityRepository.list({
+            userId: request.authUser!.id,
+            token: request.authToken!,
+            limit: parsed.data.limit,
+          }),
+        };
+      } catch (error) {
+        request.log.warn(
+          { repositoryError: error instanceof ActivityRepositoryError },
+          'Unable to load activities',
+        );
+        return reply.badGateway('Unable to load activities');
+      }
+    },
+  );
+  app.get(
+    '/api/activities/current',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      try {
+        return {
+          activity: await activityRepository.current({
+            userId: request.authUser!.id,
+            token: request.authToken!,
+          }),
+        };
+      } catch {
+        return reply.badGateway('Unable to load current activity');
+      }
+    },
+  );
+  app.post(
+    '/api/activities',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const parsed = createActivitySchema.safeParse(request.body);
+      if (!parsed.success) return reply.badRequest('Invalid activity data');
+      try {
+        return reply
+          .code(201)
+          .send(
+            await activityRepository.create({
+              userId: request.authUser!.id,
+              token: request.authToken!,
+              type: parsed.data.activity_type,
+            }),
+          );
+      } catch {
+        return reply.badGateway('Unable to start activity');
+      }
+    },
+  );
+  app.post(
+    '/api/activities/:activityId/points',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const params = activityParamsSchema.safeParse(request.params);
+      const body = appendActivityPointsSchema.safeParse(request.body);
+      if (!params.success || !body.success)
+        return reply.badRequest('Invalid activity points');
+      try {
+        const accepted = await activityRepository.appendPoints({
+          userId: request.authUser!.id,
+          token: request.authToken!,
+          activityId: params.data.activityId,
+          points: body.data.points,
+        });
+        return accepted
+          ? { accepted }
+          : reply.notFound('Active activity not found');
+      } catch {
+        return reply.badGateway('Unable to save activity points');
+      }
+    },
+  );
+  app.patch(
+    '/api/activities/:activityId/status',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const params = activityParamsSchema.safeParse(request.params);
+      const body = updateActivityStatusSchema.safeParse(request.body);
+      if (!params.success || !body.success)
+        return reply.badRequest('Invalid activity status');
+      try {
+        const activity = await activityRepository.setStatus({
+          userId: request.authUser!.id,
+          token: request.authToken!,
+          activityId: params.data.activityId,
+          status: body.data.status,
+        });
+        return activity ?? reply.notFound('Active activity not found');
+      } catch {
+        return reply.badGateway('Unable to update activity');
+      }
+    },
+  );
+  app.post(
+    '/api/activities/:activityId/finish',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const params = activityParamsSchema.safeParse(request.params);
+      if (!params.success) return reply.badRequest('Invalid activity ID');
+      try {
+        const activity = await activityRepository.finish({
+          userId: request.authUser!.id,
+          token: request.authToken!,
+          activityId: params.data.activityId,
+        });
+        return activity ?? reply.notFound('Active activity not found');
+      } catch {
+        return reply.badGateway('Unable to finish activity');
+      }
+    },
+  );
   app.get(
     '/api/me',
     { preHandler: app.verifySupabaseJwt },
@@ -173,6 +330,39 @@ export async function buildApp(
     },
   );
 
+  app.put(
+    '/api/profile',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const parsed = profileUpdateSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Invalid profile data',
+        });
+      }
+
+      try {
+        return await profileRepository.updateProfile(
+          request.authUser!.id,
+          request.authToken!,
+          parsed.data,
+        );
+      } catch (error) {
+        request.log.warn(
+          { repositoryError: isProfileRepositoryError(error) },
+          'Unable to update profile',
+        );
+        return reply.code(502).send({
+          statusCode: 502,
+          error: 'Bad Gateway',
+          message: 'Unable to update profile',
+        });
+      }
+    },
+  );
+
   app.get(
     '/api/foods',
     { preHandler: app.verifySupabaseJwt },
@@ -203,51 +393,309 @@ export async function buildApp(
       }
     },
   );
-  app.get('/api/foods/favorites',{preHandler:app.verifySupabaseJwt},async(request,reply)=>{try{return {items:await foodRepository.getFavoriteFoods({accessToken:request.authToken!})};}catch{return reply.code(502).send({statusCode:502,error:'Bad Gateway',message:'Unable to load favorite foods'});}});
-  app.get('/api/foods/recent',{preHandler:app.verifySupabaseJwt},async(request,reply)=>{try{return {items:await foodRepository.getRecentFoods({accessToken:request.authToken!})};}catch{return reply.code(502).send({statusCode:502,error:'Bad Gateway',message:'Unable to load recent foods'});}});
-  app.put('/api/foods/:id/favorite',{preHandler:app.verifySupabaseJwt},async(request,reply)=>{const p=foodItemParamsSchema.safeParse(request.params);if(!p.success)return reply.code(400).send({statusCode:400,error:'Bad Request',message:'Invalid food ID'});try{await foodRepository.setFavorite({userId:request.authUser!.id,accessToken:request.authToken!,foodId:p.data.id,favorite:true});return {favorite:true};}catch{return reply.code(502).send({statusCode:502,error:'Bad Gateway',message:'Unable to save favorite'});}});
-  app.delete('/api/foods/:id/favorite',{preHandler:app.verifySupabaseJwt},async(request,reply)=>{const p=foodItemParamsSchema.safeParse(request.params);if(!p.success)return reply.code(400).send({statusCode:400,error:'Bad Request',message:'Invalid food ID'});try{await foodRepository.setFavorite({userId:request.authUser!.id,accessToken:request.authToken!,foodId:p.data.id,favorite:false});return {favorite:false};}catch{return reply.code(502).send({statusCode:502,error:'Bad Gateway',message:'Unable to remove favorite'});}});
-
   app.get(
-    '/api/workouts/active',
+    '/api/foods/favorites',
     { preHandler: app.verifySupabaseJwt },
     async (request, reply) => {
       try {
         return {
-          plan: await workoutRepository.getActivePlan({
-            userId: request.authUser!.id,
+          items: await foodRepository.getFavoriteFoods({
             accessToken: request.authToken!,
           }),
         };
-      } catch (error) {
-        request.log.warn(
-          { repositoryError: error instanceof WorkoutRepositoryError },
-          'Unable to load active workout plan',
-        );
-        return reply.code(502).send({
-          statusCode: 502,
-          error: 'Bad Gateway',
-          message: 'Unable to load active workout plan',
+      } catch {
+        return reply
+          .code(502)
+          .send({
+            statusCode: 502,
+            error: 'Bad Gateway',
+            message: 'Unable to load favorite foods',
+          });
+      }
+    },
+  );
+  app.get(
+    '/api/foods/recent',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      try {
+        return {
+          items: await foodRepository.getRecentFoods({
+            accessToken: request.authToken!,
+          }),
+        };
+      } catch {
+        return reply
+          .code(502)
+          .send({
+            statusCode: 502,
+            error: 'Bad Gateway',
+            message: 'Unable to load recent foods',
+          });
+      }
+    },
+  );
+  app.put(
+    '/api/foods/:id/favorite',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const p = foodItemParamsSchema.safeParse(request.params);
+      if (!p.success)
+        return reply
+          .code(400)
+          .send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Invalid food ID',
+          });
+      try {
+        await foodRepository.setFavorite({
+          userId: request.authUser!.id,
+          accessToken: request.authToken!,
+          foodId: p.data.id,
+          favorite: true,
         });
+        return { favorite: true };
+      } catch {
+        return reply
+          .code(502)
+          .send({
+            statusCode: 502,
+            error: 'Bad Gateway',
+            message: 'Unable to save favorite',
+          });
+      }
+    },
+  );
+  app.delete(
+    '/api/foods/:id/favorite',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const p = foodItemParamsSchema.safeParse(request.params);
+      if (!p.success)
+        return reply
+          .code(400)
+          .send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Invalid food ID',
+          });
+      try {
+        await foodRepository.setFavorite({
+          userId: request.authUser!.id,
+          accessToken: request.authToken!,
+          foodId: p.data.id,
+          favorite: false,
+        });
+        return { favorite: false };
+      } catch {
+        return reply
+          .code(502)
+          .send({
+            statusCode: 502,
+            error: 'Bad Gateway',
+            message: 'Unable to remove favorite',
+          });
       }
     },
   );
 
-  app.get('/api/settings', { preHandler: app.verifySupabaseJwt }, async (request, reply) => {
-    try { return await settingsRepository.get(request.authUser!.id, request.authToken!); }
-    catch(error){request.log.warn({repositoryError:error instanceof SettingsRepositoryError},'Unable to load settings');return reply.code(502).send({statusCode:502,error:'Bad Gateway',message:'Unable to load settings'});}
-  });
-  app.put('/api/settings/units', { preHandler: app.verifySupabaseJwt }, async (request, reply) => {
-    const parsed=unitsSchema.safeParse(request.body);if(!parsed.success)return reply.code(400).send({statusCode:400,error:'Bad Request',message:'Invalid units'});
-    try{await settingsRepository.setUnits(request.authUser!.id,request.authToken!,parsed.data.units);return {saved:true};}catch{return reply.code(502).send({statusCode:502,error:'Bad Gateway',message:'Unable to save units'});}
-  });
-  app.put('/api/settings/nutrition-targets',{preHandler:app.verifySupabaseJwt},async(request,reply)=>{
-    const parsed=nutritionTargetsSchema.safeParse(request.body);if(!parsed.success)return reply.code(400).send({statusCode:400,error:'Bad Request',message:'Invalid nutrition targets'});
-    try{await settingsRepository.setTargets(request.authToken!,parsed.data);return {saved:true};}catch{return reply.code(502).send({statusCode:502,error:'Bad Gateway',message:'Unable to save nutrition targets'});}
-  });
-  app.post('/api/reminders',{preHandler:app.verifySupabaseJwt},async(request,reply)=>{const parsed=reminderSchema.safeParse(request.body);if(!parsed.success)return reply.code(400).send({statusCode:400,error:'Bad Request',message:'Invalid reminder'});try{return reply.code(201).send(await settingsRepository.createReminder(request.authUser!.id,request.authToken!,parsed.data));}catch{return reply.code(502).send({statusCode:502,error:'Bad Gateway',message:'Unable to save reminder'});}});
-  app.put('/api/reminders/:id',{preHandler:app.verifySupabaseJwt},async(request,reply)=>{const p=reminderParamsSchema.safeParse(request.params),b=reminderSchema.safeParse(request.body);if(!p.success||!b.success)return reply.code(400).send({statusCode:400,error:'Bad Request',message:'Invalid reminder'});try{const item=await settingsRepository.updateReminder(request.authUser!.id,request.authToken!,p.data.id,b.data);return item??reply.code(404).send({statusCode:404,error:'Not Found',message:'Reminder not found'});}catch{return reply.code(502).send({statusCode:502,error:'Bad Gateway',message:'Unable to save reminder'});}});
-  app.delete('/api/reminders/:id',{preHandler:app.verifySupabaseJwt},async(request,reply)=>{const p=reminderParamsSchema.safeParse(request.params);if(!p.success)return reply.code(400).send({statusCode:400,error:'Bad Request',message:'Invalid reminder'});try{return await settingsRepository.deleteReminder(request.authUser!.id,request.authToken!,p.data.id)?{deleted:true}:reply.code(404).send({statusCode:404,error:'Not Found',message:'Reminder not found'});}catch{return reply.code(502).send({statusCode:502,error:'Bad Gateway',message:'Unable to delete reminder'});}});
+  app.get(
+    '/api/settings',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      try {
+        return await settingsRepository.get(
+          request.authUser!.id,
+          request.authToken!,
+        );
+      } catch (error) {
+        request.log.warn(
+          { repositoryError: error instanceof SettingsRepositoryError },
+          'Unable to load settings',
+        );
+        return reply
+          .code(502)
+          .send({
+            statusCode: 502,
+            error: 'Bad Gateway',
+            message: 'Unable to load settings',
+          });
+      }
+    },
+  );
+  app.put(
+    '/api/settings/units',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const parsed = unitsSchema.safeParse(request.body);
+      if (!parsed.success)
+        return reply
+          .code(400)
+          .send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Invalid units',
+          });
+      try {
+        await settingsRepository.setUnits(
+          request.authUser!.id,
+          request.authToken!,
+          parsed.data.units,
+        );
+        return { saved: true };
+      } catch {
+        return reply
+          .code(502)
+          .send({
+            statusCode: 502,
+            error: 'Bad Gateway',
+            message: 'Unable to save units',
+          });
+      }
+    },
+  );
+  app.put(
+    '/api/settings/nutrition-targets',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const parsed = nutritionTargetsSchema.safeParse(request.body);
+      if (!parsed.success)
+        return reply
+          .code(400)
+          .send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Invalid nutrition targets',
+          });
+      try {
+        await settingsRepository.setTargets(request.authToken!, parsed.data);
+        return { saved: true };
+      } catch {
+        return reply
+          .code(502)
+          .send({
+            statusCode: 502,
+            error: 'Bad Gateway',
+            message: 'Unable to save nutrition targets',
+          });
+      }
+    },
+  );
+  app.post(
+    '/api/reminders',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const parsed = reminderSchema.safeParse(request.body);
+      if (!parsed.success)
+        return reply
+          .code(400)
+          .send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Invalid reminder',
+          });
+      try {
+        return reply
+          .code(201)
+          .send(
+            await settingsRepository.createReminder(
+              request.authUser!.id,
+              request.authToken!,
+              parsed.data,
+            ),
+          );
+      } catch {
+        return reply
+          .code(502)
+          .send({
+            statusCode: 502,
+            error: 'Bad Gateway',
+            message: 'Unable to save reminder',
+          });
+      }
+    },
+  );
+  app.put(
+    '/api/reminders/:id',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const p = reminderParamsSchema.safeParse(request.params),
+        b = reminderSchema.safeParse(request.body);
+      if (!p.success || !b.success)
+        return reply
+          .code(400)
+          .send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Invalid reminder',
+          });
+      try {
+        const item = await settingsRepository.updateReminder(
+          request.authUser!.id,
+          request.authToken!,
+          p.data.id,
+          b.data,
+        );
+        return (
+          item ??
+          reply
+            .code(404)
+            .send({
+              statusCode: 404,
+              error: 'Not Found',
+              message: 'Reminder not found',
+            })
+        );
+      } catch {
+        return reply
+          .code(502)
+          .send({
+            statusCode: 502,
+            error: 'Bad Gateway',
+            message: 'Unable to save reminder',
+          });
+      }
+    },
+  );
+  app.delete(
+    '/api/reminders/:id',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const p = reminderParamsSchema.safeParse(request.params);
+      if (!p.success)
+        return reply
+          .code(400)
+          .send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Invalid reminder',
+          });
+      try {
+        return (await settingsRepository.deleteReminder(
+          request.authUser!.id,
+          request.authToken!,
+          p.data.id,
+        ))
+          ? { deleted: true }
+          : reply
+              .code(404)
+              .send({
+                statusCode: 404,
+                error: 'Not Found',
+                message: 'Reminder not found',
+              });
+      } catch {
+        return reply
+          .code(502)
+          .send({
+            statusCode: 502,
+            error: 'Bad Gateway',
+            message: 'Unable to delete reminder',
+          });
+      }
+    },
+  );
 
   app.get(
     '/api/progress',
@@ -311,186 +759,6 @@ export async function buildApp(
           statusCode: 502,
           error: 'Bad Gateway',
           message: 'Unable to save measurement',
-        });
-      }
-    },
-  );
-
-  app.get(
-    '/api/workouts/history',
-    { preHandler: app.verifySupabaseJwt },
-    async (request, reply) => {
-      const parsed = workoutHistoryQuerySchema.safeParse(request.query);
-      if (!parsed.success)
-        return reply.code(400).send({
-          statusCode: 400,
-          error: 'Bad Request',
-          message: 'Invalid workout history parameters',
-        });
-      try {
-        return {
-          items: await workoutRepository.getHistory({
-            userId: request.authUser!.id,
-            accessToken: request.authToken!,
-            limit: parsed.data.limit,
-          }),
-        };
-      } catch (error) {
-        request.log.warn(
-          { repositoryError: error instanceof WorkoutRepositoryError },
-          'Unable to load workout history',
-        );
-        return reply.code(502).send({
-          statusCode: 502,
-          error: 'Bad Gateway',
-          message: 'Unable to load workout history',
-        });
-      }
-    },
-  );
-  app.get('/api/workout-sessions/current',{preHandler:app.verifySupabaseJwt},async(request,reply)=>{try{return {session:await workoutRepository.getInProgressSession({userId:request.authUser!.id,accessToken:request.authToken!})};}catch{return reply.code(502).send({statusCode:502,error:'Bad Gateway',message:'Unable to load active workout session'});}});
-
-  app.post(
-    '/api/workouts/default-plan',
-    { preHandler: app.verifySupabaseJwt },
-    async (request, reply) => {
-      try {
-        const planId = await workoutRepository.createDefaultPlan({
-          accessToken: request.authToken!,
-        });
-        return reply.code(201).send({ planId });
-      } catch (error) {
-        request.log.warn(
-          { repositoryError: error instanceof WorkoutRepositoryError },
-          'Unable to create default workout plan',
-        );
-        return reply.code(502).send({
-          statusCode: 502,
-          error: 'Bad Gateway',
-          message: 'Unable to create default workout plan',
-        });
-      }
-    },
-  );
-
-  app.post(
-    '/api/workout-sessions',
-    { preHandler: app.verifySupabaseJwt },
-    async (request, reply) => {
-      const parsed = startWorkoutSessionSchema.safeParse(request.body);
-      if (!parsed.success)
-        return reply.code(400).send({
-          statusCode: 400,
-          error: 'Bad Request',
-          message: 'Invalid workout session data',
-        });
-      try {
-        const session = await workoutRepository.startSession({
-          userId: request.authUser!.id,
-          accessToken: request.authToken!,
-          planDayId: parsed.data.plan_day_id,
-        });
-        if (!session)
-          return reply.code(404).send({
-            statusCode: 404,
-            error: 'Not Found',
-            message: 'Workout plan day not found',
-          });
-        return reply.code(201).send(session);
-      } catch (error) {
-        request.log.warn(
-          { repositoryError: error instanceof WorkoutRepositoryError },
-          'Unable to start workout session',
-        );
-        return reply.code(502).send({
-          statusCode: 502,
-          error: 'Bad Gateway',
-          message: 'Unable to start workout session',
-        });
-      }
-    },
-  );
-
-  app.put(
-    '/api/workout-sessions/:sessionId/sets/:exerciseId/:setNumber',
-    { preHandler: app.verifySupabaseJwt },
-    async (request, reply) => {
-      const params = workoutSetParamsSchema.safeParse(request.params);
-      const body = saveWorkoutSetSchema.safeParse(request.body);
-      if (!params.success || !body.success)
-        return reply.code(400).send({
-          statusCode: 400,
-          error: 'Bad Request',
-          message: 'Invalid workout set data',
-        });
-      try {
-        const set = await workoutRepository.saveSet({
-          userId: request.authUser!.id,
-          accessToken: request.authToken!,
-          sessionId: params.data.sessionId,
-          exerciseId: params.data.exerciseId,
-          setNumber: params.data.setNumber,
-          reps: body.data.reps,
-          weightKg: body.data.weight_kg,
-          durationSeconds: body.data.duration_seconds,
-          completed: body.data.completed,
-        });
-        if (!set)
-          return reply.code(404).send({
-            statusCode: 404,
-            error: 'Not Found',
-            message: 'Active workout session not found',
-          });
-        return set;
-      } catch (error) {
-        request.log.warn(
-          { repositoryError: error instanceof WorkoutRepositoryError },
-          'Unable to save workout set',
-        );
-        return reply.code(502).send({
-          statusCode: 502,
-          error: 'Bad Gateway',
-          message: 'Unable to save workout set',
-        });
-      }
-    },
-  );
-
-  app.post(
-    '/api/workout-sessions/:sessionId/finish',
-    { preHandler: app.verifySupabaseJwt },
-    async (request, reply) => {
-      const params = workoutSessionParamsSchema.safeParse(request.params);
-      const body = finishWorkoutSessionSchema.safeParse(request.body);
-      if (!params.success || !body.success)
-        return reply.code(400).send({
-          statusCode: 400,
-          error: 'Bad Request',
-          message: 'Invalid workout completion data',
-        });
-      try {
-        const session = await workoutRepository.finishSession({
-          userId: request.authUser!.id,
-          accessToken: request.authToken!,
-          sessionId: params.data.sessionId,
-          notes: body.data.notes,
-        });
-        if (!session)
-          return reply.code(404).send({
-            statusCode: 404,
-            error: 'Not Found',
-            message: 'Active workout session not found',
-          });
-        return session;
-      } catch (error) {
-        request.log.warn(
-          { repositoryError: error instanceof WorkoutRepositoryError },
-          'Unable to finish workout session',
-        );
-        return reply.code(502).send({
-          statusCode: 502,
-          error: 'Bad Gateway',
-          message: 'Unable to finish workout session',
         });
       }
     },
@@ -680,9 +948,7 @@ export async function buildApp(
         return reply.code(item.was_created ? 201 : 200).send(item);
       } catch (error) {
         const code =
-          error instanceof FoodRepositoryError
-            ? error.databaseCode
-            : undefined;
+          error instanceof FoodRepositoryError ? error.databaseCode : undefined;
         if (code === 'PT409')
           return reply.code(409).send({
             statusCode: 409,

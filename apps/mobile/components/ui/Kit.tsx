@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 export function Card({ children }: PropsWithChildren) {
   return (
-    <View className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <View className="rounded-3xl border border-slate-100 bg-white p-5 shadow-lg shadow-slate-200/50">
       {children}
     </View>
   );
@@ -18,7 +18,7 @@ export function SectionHeader({
 }) {
   return (
     <View className="flex-row items-center justify-between">
-      <Text className="text-lg font-bold text-slate-950">{title}</Text>
+      <Text className="text-xl font-extrabold tracking-tight text-slate-900">{title}</Text>
       {action}
     </View>
   );
@@ -26,13 +26,13 @@ export function SectionHeader({
 
 export function ProgressBar({
   value,
-  color = 'bg-emerald-500',
+  color = 'bg-primary-500',
 }: {
   value: number;
   color?: string;
 }) {
   return (
-    <View className="h-2 overflow-hidden rounded-full bg-slate-200">
+    <View className="h-3 overflow-hidden rounded-full bg-slate-100">
       <View
         className={`h-full rounded-full ${color}`}
         style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
@@ -54,19 +54,23 @@ export function ActionButton({
 }) {
   const colors =
     variant === 'primary'
-      ? 'bg-emerald-600'
+      ? 'bg-primary-600 active:bg-primary-700'
       : variant === 'danger'
-        ? 'bg-red-600'
-        : 'border border-slate-300 bg-white';
+        ? 'bg-red-500 active:bg-red-600'
+        : 'border-2 border-slate-200 bg-white active:bg-slate-50';
   const textColor = variant === 'secondary' ? 'text-slate-800' : 'text-white';
+  // `active:scale-*` must stay in every state. Adding a transform class only on
+  // some renders makes NativeWind upgrade the component to an animated one
+  // after its initial render, which triggers its dev-only upgrade warning — and
+  // that warning's serializer crashes while stringifying the props.
   return (
     <Pressable
       accessibilityRole="button"
-      className={`min-h-12 items-center justify-center rounded-xl px-4 ${colors} ${disabled ? 'opacity-50' : ''}`}
+      className={`min-h-[56px] items-center justify-center rounded-2xl px-6 ${colors} active:scale-[0.98] ${disabled ? 'opacity-50' : ''} shadow-sm`}
       disabled={disabled}
       onPress={onPress}
     >
-      <Text className={`font-semibold ${textColor}`}>{label}</Text>
+      <Text className={`text-base font-bold tracking-wide ${textColor}`}>{label}</Text>
     </Pressable>
   );
 }
@@ -81,9 +85,9 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <View className="items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white p-6">
-      <Text className="text-lg font-semibold text-slate-900">{title}</Text>
-      <Text className="text-center leading-5 text-slate-500">
+    <View className="items-center gap-4 rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50 p-8">
+      <Text className="text-xl font-bold text-slate-800">{title}</Text>
+      <Text className="text-center text-base leading-6 text-slate-500">
         {description}
       </Text>
       {action}

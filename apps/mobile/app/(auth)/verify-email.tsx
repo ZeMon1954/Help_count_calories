@@ -10,12 +10,12 @@ export default function VerifyEmailScreen() {
       title="ตรวจสอบอีเมลของคุณ"
       subtitle="เราได้ส่งลิงก์ยืนยันบัญชีแล้ว กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ"
       footer={
-        <Link className="font-semibold text-emerald-700" href="/(auth)/login">
+        <Link className="font-bold text-primary-600 active:text-primary-800" href="/(auth)/login">
           ไปหน้าเข้าสู่ระบบ
         </Link>
       }
     >
-      <Text className="rounded-xl bg-emerald-50 p-4 text-center leading-6 text-emerald-900">
+      <Text className="rounded-2xl border border-primary-100 bg-primary-50 p-5 text-center leading-6 text-primary-900 shadow-sm shadow-primary-100/50">
         {email
           ? `ส่งลิงก์ไปที่ ${email}`
           : 'เปิดอีเมลของคุณและกดลิงก์ยืนยันบัญชี'}

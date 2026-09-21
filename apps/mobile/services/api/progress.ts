@@ -2,13 +2,6 @@ import { apiRequest } from './client';
 
 export interface ProgressSnapshot {
   weightHistory: { id: string; weightKg: number; recordedAt: string }[];
-  workoutHistory: {
-    id: string;
-    title: string;
-    startedAt: string;
-    endedAt: string | null;
-    durationMinutes: number | null;
-  }[];
   calorieAdherence: {
     target: number | null;
     daysLogged: number;

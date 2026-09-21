@@ -11,6 +11,15 @@
       "expo-notifications",
       "expo-secure-store",
       [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "อนุญาตให้นับแคลใช้ตำแหน่งเพื่อบันทึกระยะทางและเส้นทางระหว่างกิจกรรม",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "อนุญาตให้นับแคลเลือกรูปอาหารเพื่อวิเคราะห์โภชนาการ",

@@ -288,3 +288,98 @@ test('Gemini service rejects malformed structured output', async () => {
       error.code === 'invalid_ai_response',
   );
 });
+
+test('Gemini service maps a non-food response with an empty name correctly', async () => {
+  const service = createFoodAnalysisService(
+    loadEnv({ NODE_ENV: 'test', GEMINI_API_KEY: 'test-key' }),
+    async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      is_food: false,
+                      food_name: '',
+                      items: [],
+                      confidence: 'high',
+                      warnings: [],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+  );
+
+  await assert.rejects(
+    service.analyze({
+      bytes: jpegBytes,
+      mimeType: 'image/jpeg',
+      userId: 'verified-user',
+    }),
+    (error: unknown) =>
+      error instanceof FoodAnalysisError && error.code === 'not_food',
+  );
+});
+
+test('Gemini service retries a temporary provider failure', async () => {
+  let calls = 0;
+  const delays: number[] = [];
+  const service = createFoodAnalysisService(
+    loadEnv({ NODE_ENV: 'test', GEMINI_API_KEY: 'test-key' }),
+    async () => {
+      calls += 1;
+      if (calls === 1) return new Response(null, { status: 503 });
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      is_food: true,
+                      food_name: 'กล้วย',
+                      items: [
+                        {
+                          name: 'กล้วย',
+                          estimated_quantity_g: 100,
+                          calories: 89,
+                          protein_g: 1.1,
+                          carbs_g: 22.8,
+                          fat_g: 0.3,
+                        },
+                      ],
+                      confidence: 'high',
+                      warnings: [],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    },
+    async (milliseconds) => {
+      delays.push(milliseconds);
+    },
+  );
+
+  const result = await service.analyze({
+    bytes: jpegBytes,
+    mimeType: 'image/jpeg',
+    userId: 'verified-user',
+  });
+
+  assert.equal(result.food_name, 'กล้วย');
+  assert.equal(calls, 2);
+  assert.deepEqual(delays, [250]);
+});

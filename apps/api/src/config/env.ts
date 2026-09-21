@@ -19,6 +19,8 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: optionalSecret.optional(),
   DATABASE_URL: optionalUrl.optional(),
   GEMINI_API_KEY: optionalSecret.optional(),
+  // Backward-compatible alias used by the original local setup.
+  AI_API_KEY: optionalSecret.optional(),
   GEMINI_MODEL: z.string().min(1).default('gemini-3.8-flash'),
   AI_REQUEST_TIMEOUT_MS: z.coerce
     .number()
@@ -36,5 +38,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     throw new Error(
       `Invalid environment variables: ${z.prettifyError(result.error)}`,
     );
-  return result.data;
+  return {
+    ...result.data,
+    GEMINI_API_KEY: result.data.GEMINI_API_KEY ?? result.data.AI_API_KEY,
+  };
 }

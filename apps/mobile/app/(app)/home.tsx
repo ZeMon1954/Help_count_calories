@@ -9,7 +9,6 @@ import {
   ProgressBar,
   SectionHeader,
 } from '@/components/ui/Kit';
-import { PrototypeBadge } from '@/components/ui/PrototypeBadge';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/providers/AuthProvider';
 import { useProfile } from '@/providers/ProfileProvider';
@@ -72,7 +71,6 @@ export default function HomeScreen() {
     <Screen
       title={`สวัสดี ${profile?.profile?.displayName ?? ''}`.trim()}
       subtitle="ภาพรวมสุขภาพวันนี้"
-      action={<PrototypeBadge label="Workout ยังเป็นต้นแบบ" />}
     >
       {loading ? (
         <Card>
@@ -91,53 +89,57 @@ export default function HomeScreen() {
         />
       ) : (
         <>
-          <Card>
-            <Text className="text-sm font-medium text-slate-500">
-              {remaining === null ? 'พลังงานที่บริโภค' : 'พลังงานคงเหลือ'}
+          <View className="overflow-hidden rounded-3xl bg-slate-900 p-6 shadow-xl shadow-slate-900/20">
+            <Text className="text-sm font-semibold tracking-wide text-slate-400 uppercase">
+              {remaining === null ? 'พลังงานที่บริโภค' : 'พลังงานคงเหลือ (kcal)'}
             </Text>
-            <View className="mt-2 flex-row items-end gap-2">
-              <Text className="text-4xl font-bold text-slate-950">
+            <View className="mt-2 flex-row items-baseline gap-2">
+              <Text className="text-5xl font-extrabold tracking-tighter text-white">
                 {Math.round(remaining ?? consumed.calories)}
               </Text>
-              <Text className="pb-1 text-slate-500">kcal</Text>
             </View>
             {calorieTarget !== null ? (
-              <>
+              <View className="mt-6">
                 <ProgressBar
                   value={(consumed.calories / calorieTarget) * 100}
+                  color="bg-primary-500"
                 />
-                <Text className="mt-3 text-sm text-slate-500">
-                  กินแล้ว {Math.round(consumed.calories)} จาก {calorieTarget}{' '}
-                  kcal
-                </Text>
-              </>
+                <View className="mt-3 flex-row justify-between">
+                  <Text className="text-sm font-medium text-slate-400">
+                    บริโภค {Math.round(consumed.calories)}
+                  </Text>
+                  <Text className="text-sm font-medium text-slate-400">
+                    เป้าหมาย {calorieTarget}
+                  </Text>
+                </View>
+              </View>
             ) : (
-              <Text className="mt-3 text-sm leading-5 text-amber-700">
-                ยังไม่มีเป้าหมายแคลอรีจริง ระบบจึงไม่คำนวณพลังงานคงเหลือ
+              <Text className="mt-4 text-sm leading-5 text-amber-400">
+                ยังไม่มีเป้าหมายแคลอรี
               </Text>
             )}
-          </Card>
+          </View>
 
           <View className="flex-row gap-3">
             {(
               [
-                ['โปรตีน', consumed.protein_g, summary?.targets.protein_g],
-                ['คาร์บ', consumed.carbs_g, summary?.targets.carbs_g],
-                ['ไขมัน', consumed.fat_g, summary?.targets.fat_g],
+                ['โปรตีน', consumed.protein_g, summary?.targets.protein_g, 'bg-rose-50 border-rose-100 text-rose-600', 'text-rose-900'],
+                ['คาร์บ', consumed.carbs_g, summary?.targets.carbs_g, 'bg-amber-50 border-amber-100 text-amber-600', 'text-amber-900'],
+                ['ไขมัน', consumed.fat_g, summary?.targets.fat_g, 'bg-blue-50 border-blue-100 text-blue-600', 'text-blue-900'],
               ] as const
-            ).map(([label, value, target]) => (
+            ).map(([label, value, target, colorClass, textDarkClass]) => (
               <View
                 key={label}
-                className="flex-1 gap-2 rounded-2xl border border-slate-200 bg-white p-3"
+                className={`flex-1 gap-2 rounded-3xl border p-4 shadow-sm shadow-slate-100/50 ${colorClass}`}
               >
-                <Text className="text-xs text-slate-500">{label}</Text>
-                <Text className="font-bold text-slate-900">
-                  {Math.round(value)}g
+                <Text className={`text-xs font-bold uppercase tracking-wider ${colorClass}`}>{label}</Text>
+                <Text className={`text-2xl font-black ${textDarkClass}`}>
+                  {Math.round(value as number)}<Text className="text-sm font-bold">g</Text>
                 </Text>
-                <Text className="text-xs text-slate-400">
+                <Text className={`text-xs font-medium opacity-60 ${textDarkClass}`}>
                   {target === null || target === undefined
-                    ? 'ยังไม่มีเป้าหมาย'
-                    : `จาก ${target}g`}
+                    ? 'ไม่มีเป้า'
+                    : `เป้า ${target}g`}
                 </Text>
               </View>
             ))}
@@ -149,19 +151,19 @@ export default function HomeScreen() {
       <View className="flex-row gap-3">
         <Pressable
           accessibilityRole="button"
-          className="min-h-20 flex-1 justify-center rounded-2xl bg-emerald-600 p-4"
+          className="min-h-[88px] flex-1 justify-center rounded-3xl bg-primary-600 p-5 shadow-lg shadow-primary-600/30 active:scale-[0.98]"
           onPress={() => router.push('/add-food')}
         >
-          <Text className="font-bold text-white">ค้นหาอาหาร</Text>
-          <Text className="mt-1 text-xs text-emerald-100">Catalog จริง</Text>
+          <Text className="text-lg font-bold text-white">ค้นหาอาหาร</Text>
+          <Text className="mt-1 text-sm font-medium text-primary-100">จากฐานข้อมูล</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          className="min-h-20 flex-1 justify-center rounded-2xl bg-slate-900 p-4"
+          className="min-h-[88px] flex-1 justify-center rounded-3xl bg-slate-900 p-5 shadow-lg shadow-slate-900/30 active:scale-[0.98]"
           onPress={() => router.push('/food-scanner')}
         >
-          <Text className="font-bold text-white">สแกนอาหาร</Text>
-          <Text className="mt-1 text-xs text-slate-300">ต้นแบบเท่านั้น</Text>
+          <Text className="text-lg font-bold text-white">สแกนอาหาร</Text>
+          <Text className="mt-1 text-sm font-medium text-slate-400">ด้วย AI</Text>
         </Pressable>
       </View>
 
@@ -178,19 +180,24 @@ export default function HomeScreen() {
           {entries.slice(0, 3).map((item) => (
             <View
               key={item.id}
-              className="flex-row items-center justify-between border-b border-slate-100 py-3 last:border-b-0"
+              className="flex-row items-center justify-between border-b border-slate-100 py-4 last:border-b-0"
             >
-              <View className="flex-1 pr-4">
-                <Text className="font-semibold text-slate-900">
-                  {item.food_name}
-                </Text>
-                <Text className="mt-1 text-sm text-slate-500">
-                  {item.quantity_g
-                    ? `${item.quantity_g} กรัม`
-                    : 'ไม่ระบุปริมาณ'}
-                </Text>
+              <View className="flex-row items-center gap-4 flex-1 pr-4">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+                  <Text className="text-lg">🍽️</Text>
+                </View>
+                <View>
+                  <Text className="text-base font-bold text-slate-900">
+                    {item.food_name}
+                  </Text>
+                  <Text className="mt-0.5 text-sm font-medium text-slate-500">
+                    {item.quantity_g
+                      ? `${item.quantity_g} กรัม`
+                      : 'ไม่ระบุปริมาณ'}
+                  </Text>
+                </View>
               </View>
-              <Text className="font-semibold text-slate-700">
+              <Text className="text-base font-extrabold text-primary-600">
                 {Math.round(item.calories)} kcal
               </Text>
             </View>
@@ -203,20 +210,6 @@ export default function HomeScreen() {
         />
       )}
 
-      <SectionHeader title="การฝึกวันนี้" />
-      <Card>
-        <PrototypeBadge />
-        <Text className="mt-3 text-xl font-bold text-slate-950">
-          Full Body A
-        </Text>
-        <Text className="mt-1 text-slate-500">4 ท่า · ประมาณ 45 นาที</Text>
-        <View className="mt-4">
-          <ActionButton
-            label="ดูโปรแกรมวันนี้"
-            onPress={() => router.push('/workout')}
-          />
-        </View>
-      </Card>
     </Screen>
   );
 }

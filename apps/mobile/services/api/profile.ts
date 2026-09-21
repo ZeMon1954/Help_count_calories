@@ -26,6 +26,8 @@ export interface OnboardingInput {
   availableEquipment: Equipment[];
 }
 
+export type ProfileUpdateInput = Omit<OnboardingInput, 'startingWeightKg'>;
+
 export interface ProfileSnapshot {
   profile: {
     displayName: string | null;
@@ -64,6 +66,22 @@ export async function saveOnboarding(
 ) {
   return (
     await apiRequest<ProfileSnapshot>('onboarding', {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    })
+  ).data;
+}
+
+export async function saveProfile(
+  accessToken: string,
+  input: ProfileUpdateInput,
+) {
+  return (
+    await apiRequest<ProfileSnapshot>('profile', {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${accessToken}`,

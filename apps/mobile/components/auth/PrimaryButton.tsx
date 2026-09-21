@@ -14,14 +14,14 @@ export function PrimaryButton({
   return (
     <Pressable
       accessibilityRole="button"
-      className={`min-h-12 items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 active:bg-emerald-700 ${loading ? 'opacity-60' : ''}`}
+      className={`min-h-[56px] items-center justify-center rounded-2xl bg-primary-600 px-6 py-4 shadow-lg shadow-primary-600/30 active:bg-primary-700 active:scale-[0.98] transition-all ${loading ? 'opacity-60' : ''}`}
       disabled={loading}
       onPress={onPress}
     >
       {loading ? (
         <ActivityIndicator color="#ffffff" />
       ) : (
-        <Text className="text-base font-semibold text-white">{label}</Text>
+        <Text className="text-lg font-bold tracking-wide text-white">{label}</Text>
       )}
     </Pressable>
   );

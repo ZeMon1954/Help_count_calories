@@ -111,6 +111,8 @@ const prompt = `วิเคราะห์เฉพาะอาหารที�
 export function createFoodAnalysisService(
   env: Env,
   fetchImpl: typeof fetch = fetch,
+  sleep: (milliseconds: number) => Promise<void> = (milliseconds) =>
+    new Promise((resolve) => setTimeout(resolve, milliseconds)),
 ): FoodAnalysisService {
   return {
     async analyze(input) {
@@ -123,39 +125,44 @@ export function createFoodAnalysisService(
       );
       try {
         const model = encodeURIComponent(env.GEMINI_MODEL);
-        const response = await fetchImpl(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-          {
-            method: 'POST',
-            headers: {
-              'x-goog-api-key': env.GEMINI_API_KEY,
-              'Content-Type': 'application/json',
-            },
-            signal: controller.signal,
-            body: JSON.stringify({
-              contents: [
-                {
-                  role: 'user',
-                  parts: [
-                    {
-                      inlineData: {
-                        mimeType: input.mimeType,
-                        data: input.bytes.toString('base64'),
-                      },
-                    },
-                    { text: prompt },
-                  ],
-                },
-              ],
-              generationConfig: {
-                responseMimeType: 'application/json',
-                responseJsonSchema: outputJsonSchema,
-                maxOutputTokens: 1600,
-                temperature: 0.2,
-              },
-            }),
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const requestInit: RequestInit = {
+          method: 'POST',
+          headers: {
+            'x-goog-api-key': env.GEMINI_API_KEY,
+            'Content-Type': 'application/json',
           },
-        );
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: input.mimeType,
+                      data: input.bytes.toString('base64'),
+                    },
+                  },
+                  { text: prompt },
+                ],
+              },
+            ],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseJsonSchema: outputJsonSchema,
+              maxOutputTokens: 1600,
+              temperature: 0.2,
+            },
+          }),
+        };
+        let response: Response | undefined;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          response = await fetchImpl(url, requestInit);
+          if (response.status !== 429 && response.status < 500) break;
+          if (attempt < 2) await sleep(250 * 2 ** attempt);
+        }
+        if (!response) throw new FoodAnalysisError('provider_error');
         if (!response.ok) {
           if (response.status === 429)
             throw new FoodAnalysisError('quota_exceeded', response.status);

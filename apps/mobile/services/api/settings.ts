@@ -1,7 +1,7 @@
 import { apiRequest } from './client';
 
 export type Units = 'metric' | 'imperial';
-export type ReminderType = 'meal' | 'workout' | 'weight';
+export type ReminderType = 'meal' | 'weight';
 
 export interface ReminderRecord {
   id: string;

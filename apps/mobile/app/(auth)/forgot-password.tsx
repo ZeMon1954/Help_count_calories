@@ -37,7 +37,7 @@ export default function ForgotPasswordScreen() {
       title="ลืมรหัสผ่าน"
       subtitle="กรอกอีเมลเพื่อรับลิงก์ตั้งรหัสผ่านใหม่"
       footer={
-        <Link className="font-semibold text-emerald-700" href="/(auth)/login">
+        <Link className="font-bold text-primary-600 active:text-primary-800" href="/(auth)/login">
           กลับไปหน้าเข้าสู่ระบบ
         </Link>
       }
@@ -54,7 +54,7 @@ export default function ForgotPasswordScreen() {
         placeholder="you@example.com"
       />
       {message ? (
-        <Text className="rounded-xl bg-emerald-50 p-3 leading-5 text-emerald-800">
+        <Text className="rounded-2xl border border-primary-100 bg-primary-50 p-4 leading-6 text-primary-900 shadow-sm shadow-primary-100/50">
           {message}
         </Text>
       ) : null}

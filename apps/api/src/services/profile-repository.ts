@@ -1,5 +1,8 @@
 import type { Env } from '../config/env.js';
-import type { OnboardingInput } from '../schemas/profile.js';
+import type {
+  OnboardingInput,
+  ProfileUpdateInput,
+} from '../schemas/profile.js';
 
 export interface ProfileSnapshot {
   profile: {
@@ -31,6 +34,11 @@ export interface ProfileRepository {
     userId: string,
     accessToken: string,
     input: OnboardingInput,
+  ): Promise<ProfileSnapshot>;
+  updateProfile(
+    userId: string,
+    accessToken: string,
+    input: ProfileUpdateInput,
   ): Promise<ProfileSnapshot>;
 }
 
@@ -71,6 +79,9 @@ export function createProfileRepository(
         throw new SupabaseRequestError(503);
       },
       async completeOnboarding() {
+        throw new SupabaseRequestError(503);
+      },
+      async updateProfile() {
         throw new SupabaseRequestError(503);
       },
     };
@@ -190,6 +201,33 @@ export function createProfileRepository(
               birth_date: input.birthDate ?? null,
               height_cm: input.heightCm ?? null,
               weight_kg: input.startingWeightKg ?? null,
+              goal_type: input.goalType,
+              activity_level: input.activityLevel
+                ? activityToDatabase[input.activityLevel]
+                : null,
+              workout_days: input.workoutDays,
+              training_location: input.trainingLocation,
+              experience_level: input.experienceLevel,
+              available_equipment: [...new Set(input.availableEquipment)],
+            },
+          }),
+        },
+      );
+      if (result !== true) throw new SupabaseRequestError(502);
+      return getProfile(userId, accessToken);
+    },
+    async updateProfile(userId, accessToken, input) {
+      const result = await request<boolean>(
+        'rpc/update_profile_settings',
+        accessToken,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            p_data: {
+              display_name: input.displayName,
+              birth_date: input.birthDate,
+              height_cm: input.heightCm,
               goal_type: input.goalType,
               activity_level: input.activityLevel
                 ? activityToDatabase[input.activityLevel]

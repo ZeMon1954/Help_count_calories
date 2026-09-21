@@ -65,6 +65,9 @@ function createFakeProfileRepository(): ProfileRepository & {
       completed = true;
       return completedProfile;
     },
+    async updateProfile() {
+      return completedProfile;
+    },
   };
 }
 
@@ -92,6 +95,15 @@ test('optional empty environment variables are accepted', () => {
   assert.equal(env.SUPABASE_SERVICE_ROLE_KEY, undefined);
   assert.equal(env.DATABASE_URL, undefined);
   assert.equal(env.GEMINI_API_KEY, undefined);
+});
+
+test('legacy AI_API_KEY is used as the Gemini API key', () => {
+  const env = loadEnv({
+    NODE_ENV: 'test',
+    AI_API_KEY: 'legacy-test-key',
+  });
+
+  assert.equal(env.GEMINI_API_KEY, 'legacy-test-key');
 });
 
 test('database connectivity check calls the read-only health RPC', async () => {
@@ -301,6 +313,60 @@ test('repeated onboarding submissions rely on the idempotent RPC contract', asyn
   assert.equal((await request()).statusCode, 200);
   assert.equal(repository.submissions, 2);
   assert.equal(repository.measurementRows, 1);
+  await app.close();
+});
+
+test('PUT /api/profile validates input and derives identity from the token', async () => {
+  let receivedUserId = '';
+  let receivedToken = '';
+  const repository = createFakeProfileRepository();
+  repository.updateProfile = async (userId, accessToken) => {
+    receivedUserId = userId;
+    receivedToken = accessToken;
+    return completedProfile;
+  };
+  const app = await buildApp(loadEnv({ NODE_ENV: 'test' }), {
+    verifyAccessToken: async () => ({ id: 'verified-user', email: null }),
+    profileRepository: repository,
+  });
+  const headers = { authorization: 'Bearer verified-token' };
+
+  assert.equal(
+    (
+      await app.inject({
+        method: 'PUT',
+        url: '/api/profile',
+        headers,
+        payload: {
+          ...validOnboarding,
+          startingWeightKg: undefined,
+          userId: 'attacker',
+        },
+      })
+    ).statusCode,
+    400,
+  );
+
+  const validUpdate = {
+    displayName: validOnboarding.displayName,
+    birthDate: validOnboarding.birthDate,
+    heightCm: validOnboarding.heightCm,
+    goalType: validOnboarding.goalType,
+    activityLevel: validOnboarding.activityLevel,
+    workoutDays: validOnboarding.workoutDays,
+    trainingLocation: validOnboarding.trainingLocation,
+    experienceLevel: validOnboarding.experienceLevel,
+    availableEquipment: validOnboarding.availableEquipment,
+  };
+  const response = await app.inject({
+    method: 'PUT',
+    url: '/api/profile',
+    headers,
+    payload: validUpdate,
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(receivedUserId, 'verified-user');
+  assert.equal(receivedToken, 'verified-token');
   await app.close();
 });
 

@@ -2,13 +2,6 @@ import type { Env } from '../config/env.js';
 
 export interface ProgressSnapshot {
   weightHistory: { id: string; weightKg: number; recordedAt: string }[];
-  workoutHistory: {
-    id: string;
-    title: string;
-    startedAt: string;
-    endedAt: string | null;
-    durationMinutes: number | null;
-  }[];
   calorieAdherence: {
     target: number | null;
     daysLogged: number;
@@ -82,13 +75,9 @@ export function createProgressRepository(
     async getProgress({ userId, accessToken, startUtc }) {
       const user = encodeURIComponent(userId);
       const start = encodeURIComponent(startUtc);
-      const [measurements, sessions, goals, logs] = await Promise.all([
+      const [measurements, goals, logs] = await Promise.all([
         request<Record<string, unknown>[]>(
           `body_measurements?select=id,weight_kg,recorded_at&user_id=eq.${user}&recorded_at=gte.${start}&order=recorded_at.asc`,
-          accessToken,
-        ),
-        request<Record<string, unknown>[]>(
-          `workout_sessions?select=id,started_at,ended_at,plan_day:workout_plan_days(name)&user_id=eq.${user}&status=eq.completed&started_at=gte.${start}&order=started_at.desc`,
           accessToken,
         ),
         request<Record<string, unknown>[]>(
@@ -126,25 +115,6 @@ export function createProgressRepository(
           weightKg: numeric(row.weight_kg),
           recordedAt: String(row.recorded_at),
         })),
-        workoutHistory: sessions.map((row) => {
-          const startedAt = String(row.started_at);
-          const endedAt = typeof row.ended_at === 'string' ? row.ended_at : null;
-          const day = row.plan_day as Record<string, unknown> | null;
-          return {
-            id: String(row.id),
-            title: typeof day?.name === 'string' ? day.name : 'การฝึก',
-            startedAt,
-            endedAt,
-            durationMinutes: endedAt
-              ? Math.max(
-                  0,
-                  Math.round(
-                    (Date.parse(endedAt) - Date.parse(startedAt)) / 60_000,
-                  ),
-                )
-              : null,
-          };
-        }),
         calorieAdherence: {
           target,
           daysLogged: daily.size,

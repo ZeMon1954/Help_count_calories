@@ -19,12 +19,6 @@ const labels = {
     moderately_active: 'เคลื่อนไหวปานกลาง',
     very_active: 'เคลื่อนไหวมาก',
   },
-  location: { home: 'ที่บ้าน', gym: 'ฟิตเนส', both: 'ทั้งสองที่' },
-  experience: {
-    beginner: 'เริ่มต้น',
-    intermediate: 'ปานกลาง',
-    advanced: 'ขั้นสูง',
-  },
 } as const;
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -40,16 +34,16 @@ function Row({ label, value }: { label: string; value: string }) {
 
 const settings = [
   {
-    section: 'goal',
-    title: 'เป้าหมายสุขภาพ',
-    detail: 'ดูและทดลองการแก้ไขเป้าหมาย',
+    section: 'personal',
+    title: 'ข้อมูลส่วนตัว',
+    detail: 'ชื่อ วันเกิด ส่วนสูง และระดับกิจกรรม',
   },
   {
-    section: 'workout',
-    title: 'ความต้องการในการฝึก',
-    detail: 'สถานที่ ประสบการณ์ และอุปกรณ์',
+    section: 'goal',
+    title: 'เป้าหมายสุขภาพ',
+    detail: 'เป้าหมายหลักและสารอาหาร',
   },
-  { section: 'reminders', title: 'การแจ้งเตือน', detail: 'เวลาอาหารและการฝึก' },
+  { section: 'reminders', title: 'การแจ้งเตือน', detail: 'เวลาอาหารและการชั่งน้ำหนัก' },
   { section: 'units', title: 'หน่วยวัด', detail: 'เมตริกหรืออิมพีเรียล' },
 ] as const;
 
@@ -57,10 +51,14 @@ export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
   const [loggingOut, setLoggingOut] = useState(false);
-  const personal = profile!.profile!;
-  const goal = profile!.currentGoal;
-  const measurement = profile!.latestMeasurement;
-  const preferences = profile!.workoutPreferences;
+
+  // Signing out clears the profile one render before (app)/_layout swaps the
+  // tabs for its <Redirect>, so this screen briefly re-renders without data.
+  if (!profile?.profile) return null;
+
+  const personal = profile.profile;
+  const goal = profile.currentGoal;
+  const measurement = profile.latestMeasurement;
 
   async function logout() {
     if (loggingOut) return;
@@ -73,7 +71,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <Screen title="โปรไฟล์" subtitle="ข้อมูลจริงจากบัญชีและการตั้งค่าต้นแบบ">
+    <Screen title="โปรไฟล์" subtitle="ข้อมูลสุขภาพและการตั้งค่าบัญชี">
       <Card>
         <View className="flex-row items-center gap-4">
           <View className="h-16 w-16 items-center justify-center rounded-2xl bg-emerald-600">
@@ -117,25 +115,19 @@ export default function ProfileScreen() {
               : 'ไม่ระบุ'
           }
         />
-        <Row
-          label="สถานที่ฝึก"
-          value={
-            preferences
-              ? labels.location[preferences.trainingLocation]
-              : 'ไม่ระบุ'
-          }
-        />
-        <Row
-          label="ประสบการณ์"
-          value={
-            preferences
-              ? labels.experience[preferences.experienceLevel]
-              : 'ไม่ระบุ'
-          }
-        />
       </Card>
 
       <SectionHeader title="การตั้งค่า" />
+      <Card>
+        <Pressable
+          accessibilityRole="button"
+          className="min-h-16 justify-center"
+          onPress={() => router.push('/nutrition-analysis')}
+        >
+          <Text className="font-bold text-emerald-700">AI วิเคราะห์โภชนาการ</Text>
+          <Text className="mt-1 text-sm text-slate-500">คำนวณแคลอรี โปรตีน คาร์บ และไขมันที่เหมาะกับคุณ</Text>
+        </Pressable>
+      </Card>
       <Card>
         {settings.map((item) => (
           <Pressable
@@ -157,11 +149,6 @@ export default function ProfileScreen() {
           </Pressable>
         ))}
       </Card>
-
-      <Text className="text-sm leading-5 text-amber-700">
-        การเปลี่ยนค่าในหน้าต้นแบบจะไม่บันทึกลงบัญชีจนกว่าจะมี backend endpoint
-        รองรับ
-      </Text>
 
       {loggingOut ? (
         <ActivityIndicator color="#dc2626" />

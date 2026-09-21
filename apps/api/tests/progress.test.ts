@@ -10,7 +10,6 @@ function fakeRepository(overrides: Partial<ProgressRepository> = {}): ProgressRe
     async getProgress() {
       return {
         weightHistory: [],
-        workoutHistory: [],
         calorieAdherence: { target: null, daysLogged: 0, daysWithinTarget: 0, percentage: null },
       };
     },
