@@ -10,7 +10,13 @@
       "expo-router",
       "expo-notifications",
       "expo-secure-store",
-      "expo-image-picker"
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "อนุญาตให้นับแคลเลือกรูปอาหารเพื่อวิเคราะห์โภชนาการ",
+          "cameraPermission": "อนุญาตให้นับแคลถ่ายรูปอาหารเพื่อวิเคราะห์โภชนาการ"
+        }
+      ]
     ],
     "experiments": { "typedRoutes": true },
     "web": { "bundler": "metro" },

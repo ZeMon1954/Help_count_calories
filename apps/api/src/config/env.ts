@@ -18,7 +18,14 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: optionalSecret.optional(),
   SUPABASE_SERVICE_ROLE_KEY: optionalSecret.optional(),
   DATABASE_URL: optionalUrl.optional(),
-  AI_API_KEY: optionalSecret.optional(),
+  GEMINI_API_KEY: optionalSecret.optional(),
+  GEMINI_MODEL: z.string().min(1).default('gemini-3.8-flash'),
+  AI_REQUEST_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(120000)
+    .default(30000),
 });
 
 export type Env = z.infer<typeof envSchema>;

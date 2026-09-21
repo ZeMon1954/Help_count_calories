@@ -4,6 +4,6 @@ import { useAuth } from '@/providers/AuthProvider';
 
 export default function AuthLayout() {
   const { session } = useAuth();
-  if (session) return <Redirect href="/home" />;
+  if (session) return <Redirect href="/" />;
   return <Stack screenOptions={{ headerShown: false }} />;
 }

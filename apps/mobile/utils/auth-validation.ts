@@ -15,10 +15,17 @@ export function validatePassword(password: string): string | undefined {
   return undefined;
 }
 
+export function isInvalidLoginCredentials(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.toLowerCase().includes('invalid login credentials')
+  );
+}
+
 export function getThaiAuthError(error: unknown): string {
   const message = error instanceof Error ? error.message.toLowerCase() : '';
   if (message.includes('invalid login credentials'))
-    return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+    return 'ไม่พบบัญชีนี้ หรือรหัสผ่านไม่ถูกต้อง';
   if (message.includes('email not confirmed'))
     return 'กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ';
   if (message.includes('user already registered'))

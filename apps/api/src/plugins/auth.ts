@@ -51,6 +51,7 @@ export const authPlugin = fp<AuthPluginOptions>(
         if (!identity)
           throw app.httpErrors.unauthorized('Invalid bearer token');
         request.authUser = identity;
+        request.authToken = match[1];
       },
     );
   },
@@ -62,5 +63,6 @@ declare module 'fastify' {
   }
   interface FastifyRequest {
     authUser?: AuthIdentity;
+    authToken?: string;
   }
 }

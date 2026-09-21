@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   getThaiAuthError,
+  isInvalidLoginCredentials,
   validateEmail,
   validatePassword,
 } from '../utils/auth-validation.js';
@@ -20,8 +21,11 @@ test('validates the minimum password length', () => {
 });
 
 test('returns a safe Thai message for invalid credentials', () => {
+  const error = new Error('Invalid login credentials');
   assert.equal(
-    getThaiAuthError(new Error('Invalid login credentials')),
-    'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
+    getThaiAuthError(error),
+    'ไม่พบบัญชีนี้ หรือรหัสผ่านไม่ถูกต้อง',
   );
+  assert.equal(isInvalidLoginCredentials(error), true);
+  assert.equal(isInvalidLoginCredentials(new Error('Network error')), false);
 });

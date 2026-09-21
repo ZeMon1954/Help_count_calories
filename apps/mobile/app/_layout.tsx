@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
+import { ProfileProvider } from '@/providers/ProfileProvider';
 
 function RootNavigator() {
   const { loading } = useAuth();
@@ -23,8 +24,10 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootNavigator />
-      <StatusBar style="dark" />
+      <ProfileProvider>
+        <RootNavigator />
+        <StatusBar style="dark" />
+      </ProfileProvider>
     </AuthProvider>
   );
 }

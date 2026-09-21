@@ -17,6 +17,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -26,6 +27,7 @@ export class ApiError extends Error {
 export async function apiRequest<T>(
   path: string,
   init?: RequestInit,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<ApiResponse<T>> {
   if (!apiBaseUrl) throw new ApiError('EXPO_PUBLIC_API_URL is not configured');
 
@@ -36,13 +38,15 @@ export async function apiRequest<T>(
 
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/${safePath}`, {
+    response = await fetchImpl(`${apiBaseUrl.replace(/\/$/, '')}/${safePath}`, {
       ...init,
       headers: { Accept: 'application/json', ...init?.headers },
     });
-  } catch {
+  } catch (error) {
+    const diagnostic =
+      error instanceof Error ? `: ${error.name}: ${error.message}` : '';
     console.error(
-      `[API] ${method} /${safePath} network failure after ${Date.now() - startedAt}ms`,
+      `[API] ${method} /${safePath} network failure after ${Date.now() - startedAt}ms${diagnostic}`,
     );
     throw new ApiError(
       'Unable to reach the API. Check the server, Wi-Fi, and EXPO_PUBLIC_API_URL.',
@@ -56,9 +60,13 @@ export async function apiRequest<T>(
   );
 
   if (!response.ok) {
+    const errorData = data as { message?: unknown; code?: unknown } | null;
     throw new ApiError(
-      `API request failed with HTTP ${response.status}`,
+      typeof errorData?.message === 'string'
+        ? errorData.message
+        : `API request failed with HTTP ${response.status}`,
       response.status,
+      typeof errorData?.code === 'string' ? errorData.code : undefined,
     );
   }
 
