@@ -12,6 +12,7 @@ import {
 import { AppState, Platform } from 'react-native';
 
 import { supabase } from '@/services/supabase/client';
+import { clearApiCache } from '@/services/api/client';
 
 interface SignUpResult {
   requiresEmailVerification: boolean;
@@ -104,6 +105,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const { data: subscription } = client.auth.onAuthStateChange(
       (event, nextSession) => {
         if (!active) return;
+        if (event === 'SIGNED_OUT') clearApiCache();
         setSession(nextSession);
         if (event === 'PASSWORD_RECOVERY') setRecoveryMode(true);
       },
@@ -159,6 +161,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       async signOut() {
         const { error } = await requireSupabase().auth.signOut();
         if (error) throw error;
+        clearApiCache();
       },
       async requestPasswordReset(email) {
         const redirectTo = Linking.createURL('reset-password');
