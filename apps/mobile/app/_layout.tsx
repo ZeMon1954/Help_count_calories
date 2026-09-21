@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider } from '@/providers/AuthProvider';
 import { ProfileProvider } from '@/providers/ProfileProvider';
+import { PwaStatus } from '@/components/web/PwaStatus';
 import { configureNotifications } from '@/services/reminders';
 import {
   configureReanimatedLogger,
@@ -25,6 +26,7 @@ export default function RootLayout() {
         <Stack
           screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
         />
+        <PwaStatus />
         <StatusBar style="dark" />
       </ProfileProvider>
     </AuthProvider>

@@ -108,15 +108,25 @@ export async function buildApp(
   const activityRepository =
     dependencies.activityRepository ?? createActivityRepository(env);
   const nutritionAnalysisService =
-    dependencies.nutritionAnalysisService ?? createNutritionAnalysisService(env);
+    dependencies.nutritionAnalysisService ??
+    createNutritionAnalysisService(env);
   const analysisRequests = new Map<string, number[]>();
 
   await app.register(sensible);
   await app.register(multipart, {
     limits: { files: 1, fields: 0, parts: 1, fileSize: FOOD_IMAGE_MAX_BYTES },
   });
+  const allowedOrigins = new Set(
+    env.CORS_ALLOWED_ORIGINS.split(',')
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
   await app.register(cors, {
-    origin: env.NODE_ENV === 'production' ? false : true,
+    origin:
+      env.NODE_ENV !== 'production'
+        ? true
+        : (origin, callback) =>
+            callback(null, !origin || allowedOrigins.has(origin)),
   });
   await app.register(authPlugin, {
     env,
@@ -188,15 +198,13 @@ export async function buildApp(
       const parsed = createActivitySchema.safeParse(request.body);
       if (!parsed.success) return reply.badRequest('Invalid activity data');
       try {
-        return reply
-          .code(201)
-          .send(
-            await activityRepository.create({
-              userId: request.authUser!.id,
-              token: request.authToken!,
-              type: parsed.data.activity_type,
-            }),
-          );
+        return reply.code(201).send(
+          await activityRepository.create({
+            userId: request.authUser!.id,
+            token: request.authToken!,
+            type: parsed.data.activity_type,
+          }),
+        );
       } catch {
         return reply.badGateway('Unable to start activity');
       }
@@ -404,13 +412,11 @@ export async function buildApp(
           }),
         };
       } catch {
-        return reply
-          .code(502)
-          .send({
-            statusCode: 502,
-            error: 'Bad Gateway',
-            message: 'Unable to load favorite foods',
-          });
+        return reply.code(502).send({
+          statusCode: 502,
+          error: 'Bad Gateway',
+          message: 'Unable to load favorite foods',
+        });
       }
     },
   );
@@ -425,13 +431,11 @@ export async function buildApp(
           }),
         };
       } catch {
-        return reply
-          .code(502)
-          .send({
-            statusCode: 502,
-            error: 'Bad Gateway',
-            message: 'Unable to load recent foods',
-          });
+        return reply.code(502).send({
+          statusCode: 502,
+          error: 'Bad Gateway',
+          message: 'Unable to load recent foods',
+        });
       }
     },
   );
@@ -441,13 +445,11 @@ export async function buildApp(
     async (request, reply) => {
       const p = foodItemParamsSchema.safeParse(request.params);
       if (!p.success)
-        return reply
-          .code(400)
-          .send({
-            statusCode: 400,
-            error: 'Bad Request',
-            message: 'Invalid food ID',
-          });
+        return reply.code(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Invalid food ID',
+        });
       try {
         await foodRepository.setFavorite({
           userId: request.authUser!.id,
@@ -457,13 +459,11 @@ export async function buildApp(
         });
         return { favorite: true };
       } catch {
-        return reply
-          .code(502)
-          .send({
-            statusCode: 502,
-            error: 'Bad Gateway',
-            message: 'Unable to save favorite',
-          });
+        return reply.code(502).send({
+          statusCode: 502,
+          error: 'Bad Gateway',
+          message: 'Unable to save favorite',
+        });
       }
     },
   );
@@ -473,13 +473,11 @@ export async function buildApp(
     async (request, reply) => {
       const p = foodItemParamsSchema.safeParse(request.params);
       if (!p.success)
-        return reply
-          .code(400)
-          .send({
-            statusCode: 400,
-            error: 'Bad Request',
-            message: 'Invalid food ID',
-          });
+        return reply.code(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Invalid food ID',
+        });
       try {
         await foodRepository.setFavorite({
           userId: request.authUser!.id,
@@ -489,13 +487,11 @@ export async function buildApp(
         });
         return { favorite: false };
       } catch {
-        return reply
-          .code(502)
-          .send({
-            statusCode: 502,
-            error: 'Bad Gateway',
-            message: 'Unable to remove favorite',
-          });
+        return reply.code(502).send({
+          statusCode: 502,
+          error: 'Bad Gateway',
+          message: 'Unable to remove favorite',
+        });
       }
     },
   );
@@ -514,13 +510,11 @@ export async function buildApp(
           { repositoryError: error instanceof SettingsRepositoryError },
           'Unable to load settings',
         );
-        return reply
-          .code(502)
-          .send({
-            statusCode: 502,
-            error: 'Bad Gateway',
-            message: 'Unable to load settings',
-          });
+        return reply.code(502).send({
+          statusCode: 502,
+          error: 'Bad Gateway',
+          message: 'Unable to load settings',
+        });
       }
     },
   );
@@ -530,13 +524,11 @@ export async function buildApp(
     async (request, reply) => {
       const parsed = unitsSchema.safeParse(request.body);
       if (!parsed.success)
-        return reply
-          .code(400)
-          .send({
-            statusCode: 400,
-            error: 'Bad Request',
-            message: 'Invalid units',
-          });
+        return reply.code(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Invalid units',
+        });
       try {
         await settingsRepository.setUnits(
           request.authUser!.id,
@@ -545,13 +537,11 @@ export async function buildApp(
         );
         return { saved: true };
       } catch {
-        return reply
-          .code(502)
-          .send({
-            statusCode: 502,
-            error: 'Bad Gateway',
-            message: 'Unable to save units',
-          });
+        return reply.code(502).send({
+          statusCode: 502,
+          error: 'Bad Gateway',
+          message: 'Unable to save units',
+        });
       }
     },
   );
@@ -561,24 +551,20 @@ export async function buildApp(
     async (request, reply) => {
       const parsed = nutritionTargetsSchema.safeParse(request.body);
       if (!parsed.success)
-        return reply
-          .code(400)
-          .send({
-            statusCode: 400,
-            error: 'Bad Request',
-            message: 'Invalid nutrition targets',
-          });
+        return reply.code(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Invalid nutrition targets',
+        });
       try {
         await settingsRepository.setTargets(request.authToken!, parsed.data);
         return { saved: true };
       } catch {
-        return reply
-          .code(502)
-          .send({
-            statusCode: 502,
-            error: 'Bad Gateway',
-            message: 'Unable to save nutrition targets',
-          });
+        return reply.code(502).send({
+          statusCode: 502,
+          error: 'Bad Gateway',
+          message: 'Unable to save nutrition targets',
+        });
       }
     },
   );
@@ -588,13 +574,11 @@ export async function buildApp(
     async (request, reply) => {
       const parsed = reminderSchema.safeParse(request.body);
       if (!parsed.success)
-        return reply
-          .code(400)
-          .send({
-            statusCode: 400,
-            error: 'Bad Request',
-            message: 'Invalid reminder',
-          });
+        return reply.code(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Invalid reminder',
+        });
       try {
         return reply
           .code(201)
@@ -606,13 +590,11 @@ export async function buildApp(
             ),
           );
       } catch {
-        return reply
-          .code(502)
-          .send({
-            statusCode: 502,
-            error: 'Bad Gateway',
-            message: 'Unable to save reminder',
-          });
+        return reply.code(502).send({
+          statusCode: 502,
+          error: 'Bad Gateway',
+          message: 'Unable to save reminder',
+        });
       }
     },
   );
@@ -623,13 +605,11 @@ export async function buildApp(
       const p = reminderParamsSchema.safeParse(request.params),
         b = reminderSchema.safeParse(request.body);
       if (!p.success || !b.success)
-        return reply
-          .code(400)
-          .send({
-            statusCode: 400,
-            error: 'Bad Request',
-            message: 'Invalid reminder',
-          });
+        return reply.code(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Invalid reminder',
+        });
       try {
         const item = await settingsRepository.updateReminder(
           request.authUser!.id,
@@ -639,22 +619,18 @@ export async function buildApp(
         );
         return (
           item ??
-          reply
-            .code(404)
-            .send({
-              statusCode: 404,
-              error: 'Not Found',
-              message: 'Reminder not found',
-            })
+          reply.code(404).send({
+            statusCode: 404,
+            error: 'Not Found',
+            message: 'Reminder not found',
+          })
         );
       } catch {
-        return reply
-          .code(502)
-          .send({
-            statusCode: 502,
-            error: 'Bad Gateway',
-            message: 'Unable to save reminder',
-          });
+        return reply.code(502).send({
+          statusCode: 502,
+          error: 'Bad Gateway',
+          message: 'Unable to save reminder',
+        });
       }
     },
   );
@@ -664,13 +640,11 @@ export async function buildApp(
     async (request, reply) => {
       const p = reminderParamsSchema.safeParse(request.params);
       if (!p.success)
-        return reply
-          .code(400)
-          .send({
-            statusCode: 400,
-            error: 'Bad Request',
-            message: 'Invalid reminder',
-          });
+        return reply.code(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Invalid reminder',
+        });
       try {
         return (await settingsRepository.deleteReminder(
           request.authUser!.id,
@@ -678,21 +652,17 @@ export async function buildApp(
           p.data.id,
         ))
           ? { deleted: true }
-          : reply
-              .code(404)
-              .send({
-                statusCode: 404,
-                error: 'Not Found',
-                message: 'Reminder not found',
-              });
+          : reply.code(404).send({
+              statusCode: 404,
+              error: 'Not Found',
+              message: 'Reminder not found',
+            });
       } catch {
-        return reply
-          .code(502)
-          .send({
-            statusCode: 502,
-            error: 'Bad Gateway',
-            message: 'Unable to delete reminder',
-          });
+        return reply.code(502).send({
+          statusCode: 502,
+          error: 'Bad Gateway',
+          message: 'Unable to delete reminder',
+        });
       }
     },
   );

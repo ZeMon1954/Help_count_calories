@@ -391,7 +391,9 @@ export default function ActivityScreen() {
             <View className="mx-3 mb-2 overflow-hidden rounded-[36px] border border-white/10 bg-slate-950/95 p-6 shadow-2xl">
               {foregroundOnly ? (
                 <Text className="mb-3 text-center text-xs font-medium text-amber-300">
-                  เปิดแอปค้างไว้เพื่อบันทึกเส้นทาง
+                  {Platform.OS === 'web'
+                    ? 'กรุณาเปิดหน้าจอและใช้งานแอปไว้ด้านหน้า การติดตามตำแหน่งอาจหยุดเมื่อสลับแอปหรือล็อกหน้าจอ'
+                    : 'เปิดแอปค้างไว้เพื่อบันทึกเส้นทาง'}
                 </Text>
               ) : null}
               <Text className="text-center text-[56px] font-black tracking-tighter text-white">
@@ -601,7 +603,9 @@ export default function ActivityScreen() {
             {history.length ? (
               history.map((item) => (
                 <Card key={item.id}>
-                  {item.route && item.route.length > 1 ? (
+                  {Platform.OS !== 'web' &&
+                  item.route &&
+                  item.route.length > 1 ? (
                     <View className="mb-4 h-32 w-full overflow-hidden rounded-2xl bg-slate-100">
                       <MapView
                         style={{ flex: 1 }}

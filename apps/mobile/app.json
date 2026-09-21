@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "AI Fitness & Calorie Tracker",
+    "name": "นับแคล",
     "slug": "ai-fitness-calorie-tracker",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -28,7 +28,11 @@
       ]
     ],
     "experiments": { "typedRoutes": true },
-    "web": { "bundler": "metro" },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./public/icon-192.png"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.example.aifitness"

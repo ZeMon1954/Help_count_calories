@@ -14,6 +14,7 @@ const envSchema = z.object({
     .default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   HOST: z.string().min(1).default('0.0.0.0'),
+  CORS_ALLOWED_ORIGINS: z.string().default(''),
   SUPABASE_URL: optionalUrl.optional(),
   SUPABASE_ANON_KEY: optionalSecret.optional(),
   SUPABASE_SERVICE_ROLE_KEY: optionalSecret.optional(),

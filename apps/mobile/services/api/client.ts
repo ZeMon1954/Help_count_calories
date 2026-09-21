@@ -36,20 +36,45 @@ export async function apiRequest<T>(
   const startedAt = Date.now();
   console.info(`[API] ${method} /${safePath} started`);
 
-  let response: Response;
-  try {
-    response = await fetchImpl(`${apiBaseUrl.replace(/\/$/, '')}/${safePath}`, {
-      ...init,
-      headers: { Accept: 'application/json', ...init?.headers },
-    });
-  } catch (error) {
+  let response: Response | undefined;
+  let lastError: unknown;
+  const attempts = method.toUpperCase() === 'GET' ? 2 : 1;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 75_000);
+    const abortFromCaller = () => controller.abort();
+    init?.signal?.addEventListener('abort', abortFromCaller, { once: true });
+    try {
+      response = await fetchImpl(
+        `${apiBaseUrl.replace(/\/$/, '')}/${safePath}`,
+        {
+          ...init,
+          signal: controller.signal,
+          headers: { Accept: 'application/json', ...init?.headers },
+        },
+      );
+      break;
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < attempts && !init?.signal?.aborted) {
+        await new Promise((resolve) => setTimeout(resolve, 1_500));
+      }
+    } finally {
+      clearTimeout(timeout);
+      init?.signal?.removeEventListener('abort', abortFromCaller);
+    }
+  }
+
+  if (!response) {
+    const error = lastError;
     const diagnostic =
       error instanceof Error ? `: ${error.name}: ${error.message}` : '';
     console.error(
       `[API] ${method} /${safePath} network failure after ${Date.now() - startedAt}ms${diagnostic}`,
     );
     throw new ApiError(
-      'Unable to reach the API. Check the server, Wi-Fi, and EXPO_PUBLIC_API_URL.',
+      'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง',
     );
   }
 
