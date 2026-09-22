@@ -29,6 +29,8 @@
     ],
     "experiments": { "typedRoutes": true },
     "web": {
+      "name": "นับแคล",
+      "shortName": "นับแคล",
       "bundler": "metro",
       "output": "single",
       "favicon": "./public/icon-192.png"
