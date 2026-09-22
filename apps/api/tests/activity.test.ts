@@ -3,7 +3,10 @@ import test from 'node:test';
 
 import { buildApp } from '../src/app.js';
 import { loadEnv } from '../src/config/env.js';
-import type { ActivityRepository } from '../src/services/activity-repository.js';
+import {
+  createActivityRepository,
+  type ActivityRepository,
+} from '../src/services/activity-repository.js';
 import { calculateActivity } from '../src/services/activity-calculator.js';
 
 const record = {
@@ -171,4 +174,34 @@ test('calculator resumes after a long paused gap without adding a jump', () => {
   assert.equal(summary.accepted.length, 4);
   assert.equal(summary.movingSeconds, 60);
   assert.ok(summary.distanceM > 200 && summary.distanceM < 230);
+});
+
+test('activity repository retries a transient Supabase point insert failure', async () => {
+  let insertAttempts = 0;
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url = String(input);
+    if (url.includes('activities?select=id'))
+      return new Response(JSON.stringify([{ id: record.id }]), { status: 200 });
+    if (url.includes('activity_points')) {
+      insertAttempts += 1;
+      if (insertAttempts === 1)
+        return new Response(JSON.stringify({ message: 'temporary' }), { status: 503 });
+      return new Response(null, { status: 201 });
+    }
+    throw new Error(`Unexpected request ${url} ${init?.method ?? 'GET'}`);
+  };
+  const repo = createActivityRepository(
+    loadEnv({
+      NODE_ENV: 'test',
+      SUPABASE_URL: 'https://example.supabase.co',
+      SUPABASE_ANON_KEY: 'anon-key',
+    }),
+    fetchImpl,
+  );
+  const accepted = await repo.appendPoints({
+    userId: 'verified-user', token: 'token', activityId: record.id,
+    points: [{ sequence: 0, recorded_at: '2026-09-21T00:00:00.000Z', latitude: 13.7563, longitude: 100.5018, accuracy_m: 5, altitude_m: null, speed_mps: null }],
+  });
+  assert.equal(accepted, 1);
+  assert.equal(insertAttempts, 2);
 });

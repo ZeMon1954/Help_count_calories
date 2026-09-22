@@ -229,7 +229,18 @@ export async function buildApp(
         return accepted
           ? { accepted }
           : reply.notFound('Active activity not found');
-      } catch {
+      } catch (error) {
+        request.log.warn(
+          {
+            upstreamStatus:
+              error instanceof ActivityRepositoryError ? error.status : undefined,
+            operation:
+              error instanceof ActivityRepositoryError
+                ? error.operation
+                : undefined,
+          },
+          'Unable to save activity points',
+        );
         return reply.badGateway('Unable to save activity points');
       }
     },

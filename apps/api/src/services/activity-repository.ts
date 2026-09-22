@@ -53,7 +53,10 @@ export interface ActivityRepository {
 }
 
 export class ActivityRepositoryError extends Error {
-  constructor(readonly status: number) {
+  constructor(
+    readonly status: number,
+    readonly operation?: string,
+  ) {
     super('Activity repository request failed');
   }
 }
@@ -112,24 +115,37 @@ export function createActivityRepository(
     token: string,
     init?: RequestInit,
   ): Promise<T> => {
-    let response: Response;
-    try {
-      response = await fetchImpl(`${base}/${path}`, {
-        ...init,
-        headers: {
-          apikey: env.SUPABASE_ANON_KEY!,
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-          ...init?.headers,
-        },
-        signal: AbortSignal.timeout(15_000),
-      });
-    } catch {
-      throw new ActivityRepositoryError(502);
+    let response: Response | undefined;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        response = await fetchImpl(`${base}/${path}`, {
+          ...init,
+          headers: {
+            apikey: env.SUPABASE_ANON_KEY!,
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+            ...init?.headers,
+          },
+          signal: AbortSignal.timeout(15_000),
+        });
+      } catch {
+        if (attempt < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt));
+          continue;
+        }
+        throw new ActivityRepositoryError(502, init?.method ?? 'GET');
+      }
+      if (response.status !== 429 && response.status < 500) break;
+      if (attempt < 2)
+        await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt));
     }
-    if (!response.ok) throw new ActivityRepositoryError(response.status);
+    if (!response) throw new ActivityRepositoryError(502, init?.method ?? 'GET');
+    if (!response.ok)
+      throw new ActivityRepositoryError(response.status, init?.method ?? 'GET');
     if (response.status === 204) return undefined as T;
-    return (await response.json()) as T;
+    const responseText = await response.text();
+    if (!responseText) return undefined as T;
+    return JSON.parse(responseText) as T;
   };
   const select =
     'id,activity_type,status,started_at,ended_at,elapsed_seconds,moving_seconds,distance_m,elevation_gain_m,average_speed_mps,average_pace_seconds_per_km,calories,route:activity_points(sequence,latitude,longitude)';
