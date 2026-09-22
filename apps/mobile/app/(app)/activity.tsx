@@ -333,6 +333,29 @@ export default function ActivityScreen() {
     }
   }
 
+  function confirmFinish() {
+    const title = 'จบกิจกรรม?';
+    const message =
+      'ระบบจะคำนวณและบันทึกผลการออกกำลังกายครั้งนี้';
+
+    // React Native Web's Alert implementation does not reliably invoke
+    // callbacks for multi-button alerts. Use the browser confirmation dialog
+    // so pressing "finish" always reaches the save flow on web.
+    if (Platform.OS === 'web') {
+      if (globalThis.confirm(`${title}\n\n${message}`)) void finish();
+      return;
+    }
+
+    Alert.alert(title, message, [
+      { text: 'ยกเลิก', style: 'cancel' },
+      {
+        text: 'จบและบันทึก',
+        style: 'destructive',
+        onPress: () => void finish(),
+      },
+    ]);
+  }
+
   const distanceM = useMemo(() => routeDistance(route), [route]);
   const pace =
     distanceM > 20 ? Math.round(elapsed / (distanceM / 1_000)) : null;
@@ -443,20 +466,7 @@ export default function ActivityScreen() {
               <View className="mt-6 flex-row items-center justify-center gap-5">
                 <PressScale
                   disabled={busy}
-                  onPress={() =>
-                    Alert.alert(
-                      'จบกิจกรรม?',
-                      'ระบบจะคำนวณและบันทึกผลการออกกำลังกายครั้งนี้',
-                      [
-                        { text: 'ยกเลิก', style: 'cancel' },
-                        {
-                          text: 'จบและบันทึก',
-                          style: 'destructive',
-                          onPress: () => void finish(),
-                        },
-                      ],
-                    )
-                  }
+                  onPress={confirmFinish}
                   className="h-16 w-16 items-center justify-center rounded-full bg-white/10"
                 >
                   <Text className="text-xs font-bold text-white">จบ</Text>
