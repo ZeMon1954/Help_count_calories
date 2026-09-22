@@ -117,6 +117,7 @@ export default function ActivityScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [foregroundOnly, setForegroundOnly] = useState(false);
   const [error, setError] = useState('');
   const [showHistory, setShowHistory] = useState(false);
@@ -310,6 +311,7 @@ export default function ActivityScreen() {
   async function finish() {
     if (!active || !session?.access_token || busy) return;
     setBusy(true);
+    setSaving(true);
     setError('');
     try {
       await pauseBackgroundTracking();
@@ -336,6 +338,7 @@ export default function ActivityScreen() {
           : 'บันทึกกิจกรรมไม่สำเร็จ ข้อมูลเดิมยังอยู่',
       );
     } finally {
+      setSaving(false);
       setBusy(false);
     }
   }
@@ -690,6 +693,32 @@ export default function ActivityScreen() {
             )}
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+
+      <Modal
+        visible={saving}
+        transparent
+        statusBarTranslucent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View
+          className="flex-1 items-center justify-center bg-slate-950/80 px-8"
+          accessibilityViewIsModal
+          accessibilityLabel="กำลังบันทึกกิจกรรม"
+        >
+          <View className="w-full max-w-sm items-center rounded-[32px] border border-white/10 bg-slate-900 px-8 py-10 shadow-2xl">
+            <View className="h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15">
+              <ActivityIndicator color="#10b981" size="large" />
+            </View>
+            <Text className="mt-5 text-xl font-extrabold text-white">
+              กำลังบันทึกกิจกรรม
+            </Text>
+            <Text className="mt-2 text-center text-sm leading-5 text-slate-400">
+              กำลังส่งพิกัดและคำนวณเวลา ระยะทาง และเพซ กรุณารอสักครู่
+            </Text>
+          </View>
+        </View>
       </Modal>
     </View>
   );
