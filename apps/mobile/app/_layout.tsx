@@ -1,4 +1,7 @@
 import '../global.css';
+// Register background tasks before Expo Router mounts any screen. The native
+// background runtime loads this root module when location updates arrive.
+import '@/services/activity-tracking';
 
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';

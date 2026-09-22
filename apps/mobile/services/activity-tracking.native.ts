@@ -171,10 +171,12 @@ export async function beginBackgroundTracking(activityId: string) {
       deferredUpdatesDistance: 20,
       deferredUpdatesInterval: 15_000,
       pausesUpdatesAutomatically: false,
+      activityType: Location.ActivityType.Fitness,
       showsBackgroundLocationIndicator: true,
       foregroundService: {
         notificationTitle: 'กำลังบันทึกกิจกรรม',
         notificationBody: 'นับแคลกำลังติดตามระยะทางของคุณ',
+        killServiceOnDestroy: false,
       },
     });
   }
