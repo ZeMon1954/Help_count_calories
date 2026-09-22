@@ -207,7 +207,14 @@ export default function ActivityScreen() {
       setElapsed(
         Math.max(
           0,
-          Math.floor((Date.now() - Date.parse(active.startedAt)) / 1000),
+          active.elapsedSeconds +
+            (active.status === 'in_progress'
+              ? Math.floor(
+                  (Date.now() -
+                    Date.parse(active.updatedAt ?? active.startedAt)) /
+                    1000,
+                )
+              : 0),
         ),
       );
     update();
@@ -657,7 +664,7 @@ export default function ActivityScreen() {
                     <Text className="flex-1 text-xs text-slate-500">
                       เวลา{' '}
                       <Text className="font-bold text-slate-800">
-                        {formatDuration(item.movingSeconds)}
+                        {formatDuration(item.elapsedSeconds)}
                       </Text>
                     </Text>
                     <Text className="flex-1 text-xs text-slate-500">

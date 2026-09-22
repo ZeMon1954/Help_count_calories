@@ -14,6 +14,7 @@ const record = {
   activityType: 'run' as const,
   status: 'in_progress' as const,
   startedAt: '2026-09-21T00:00:00.000Z',
+  updatedAt: '2026-09-21T00:00:00.000Z',
   endedAt: null,
   elapsedSeconds: 0,
   movingSeconds: 0,
@@ -204,4 +205,72 @@ test('activity repository retries a transient Supabase point insert failure', as
   });
   assert.equal(accepted, 1);
   assert.equal(insertAttempts, 2);
+});
+
+test('finishing keeps active elapsed time when GPS points are unusable', async () => {
+  const startedAt = new Date(Date.now() - 90_000).toISOString();
+  let savedBody: Record<string, unknown> | undefined;
+  const databaseRow = {
+    id: record.id,
+    activity_type: 'run',
+    status: 'in_progress',
+    started_at: startedAt,
+    updated_at: startedAt,
+    ended_at: null,
+    elapsed_seconds: 0,
+    moving_seconds: 0,
+    distance_m: 0,
+    elevation_gain_m: 0,
+    average_speed_mps: null,
+    average_pace_seconds_per_km: null,
+    calories: 0,
+  };
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url = String(input);
+    if (url.includes('activity_points?select='))
+      return new Response(
+        JSON.stringify([
+          {
+            sequence: 0,
+            recorded_at: startedAt,
+            latitude: 13.7563,
+            longitude: 100.5018,
+            accuracy_m: 150,
+            altitude_m: null,
+            speed_mps: null,
+          },
+        ]),
+        { status: 200 },
+      );
+    if (url.includes('body_measurements?select='))
+      return new Response(JSON.stringify([]), { status: 200 });
+    if (init?.method === 'PATCH') {
+      savedBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify([{ ...databaseRow, ...savedBody }]), {
+        status: 200,
+      });
+    }
+    if (url.includes('activities?select='))
+      return new Response(JSON.stringify([databaseRow]), { status: 200 });
+    throw new Error(`Unexpected request ${url}`);
+  };
+  const repo = createActivityRepository(
+    loadEnv({
+      NODE_ENV: 'test',
+      SUPABASE_URL: 'https://example.supabase.co',
+      SUPABASE_ANON_KEY: 'anon-key',
+    }),
+    fetchImpl,
+  );
+
+  const finished = await repo.finish({
+    userId: 'verified-user',
+    token: 'token',
+    activityId: record.id,
+  });
+
+  assert.ok(finished);
+  assert.ok(finished.elapsedSeconds >= 89);
+  assert.equal(finished.distanceM, 0);
+  assert.ok(Number(savedBody?.elapsed_seconds) >= 89);
 });

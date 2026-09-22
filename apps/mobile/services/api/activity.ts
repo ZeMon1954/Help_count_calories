@@ -6,6 +6,7 @@ export interface ActivityRecord {
   activityType: ActivityType;
   status: 'in_progress' | 'paused' | 'completed' | 'discarded';
   startedAt: string;
+  updatedAt: string;
   endedAt: string | null;
   elapsedSeconds: number;
   movingSeconds: number;

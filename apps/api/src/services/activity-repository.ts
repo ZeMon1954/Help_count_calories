@@ -7,6 +7,7 @@ export interface ActivityRecord {
   activityType: ActivityType;
   status: 'in_progress' | 'paused' | 'completed' | 'discarded';
   startedAt: string;
+  updatedAt: string;
   endedAt: string | null;
   elapsedSeconds: number;
   movingSeconds: number;
@@ -68,6 +69,7 @@ function mapActivity(row: Record<string, unknown>): ActivityRecord {
     activityType: row.activity_type as ActivityType,
     status: row.status as ActivityRecord['status'],
     startedAt: String(row.started_at),
+    updatedAt: String(row.updated_at ?? row.started_at),
     endedAt: typeof row.ended_at === 'string' ? row.ended_at : null,
     elapsedSeconds: numeric(row.elapsed_seconds),
     movingSeconds: numeric(row.moving_seconds),
@@ -148,7 +150,7 @@ export function createActivityRepository(
     return JSON.parse(responseText) as T;
   };
   const select =
-    'id,activity_type,status,started_at,ended_at,elapsed_seconds,moving_seconds,distance_m,elevation_gain_m,average_speed_mps,average_pace_seconds_per_km,calories,route:activity_points(sequence,latitude,longitude)';
+    'id,activity_type,status,started_at,updated_at,ended_at,elapsed_seconds,moving_seconds,distance_m,elevation_gain_m,average_speed_mps,average_pace_seconds_per_km,calories,route:activity_points(sequence,latitude,longitude)';
   return {
     async create({ userId, token, type }) {
       const active = await this.current({ userId, token });
@@ -205,6 +207,23 @@ export function createActivityRepository(
       return points.length;
     },
     async setStatus({ userId, token, activityId, status }) {
+      const current = await request<Record<string, unknown>[]>(
+        `activities?select=status,elapsed_seconds,updated_at&id=eq.${encodeURIComponent(activityId)}&user_id=eq.${encodeURIComponent(userId)}&status=in.(in_progress,paused)&limit=1`,
+        token,
+      );
+      if (!current[0]) return null;
+      const now = new Date();
+      const elapsedSeconds =
+        current[0].status === 'in_progress' && status === 'paused'
+          ? numeric(current[0].elapsed_seconds) +
+            Math.max(
+              0,
+              Math.round(
+                (now.getTime() - Date.parse(String(current[0].updated_at))) /
+                  1000,
+              ),
+            )
+          : numeric(current[0].elapsed_seconds);
       const rows = await request<Record<string, unknown>[]>(
         `activities?id=eq.${encodeURIComponent(activityId)}&user_id=eq.${encodeURIComponent(userId)}&status=in.(in_progress,paused)`,
         token,
@@ -216,7 +235,8 @@ export function createActivityRepository(
           },
           body: JSON.stringify({
             status,
-            updated_at: new Date().toISOString(),
+            elapsed_seconds: elapsedSeconds,
+            updated_at: now.toISOString(),
           }),
         },
       );
@@ -228,6 +248,7 @@ export function createActivityRepository(
         token,
       );
       if (!activities[0]) return null;
+      const finishedAt = new Date();
       const points = await request<Record<string, unknown>[]>(
         `activity_points?select=sequence,recorded_at,latitude,longitude,accuracy_m,altitude_m,speed_mps&activity_id=eq.${encodeURIComponent(activityId)}&order=sequence.asc`,
         token,
@@ -250,6 +271,18 @@ export function createActivityRepository(
         inputs,
         weights[0] ? numeric(weights[0].weight_kg) : 70,
       );
+      const trackedElapsedSeconds =
+        numeric(activities[0].elapsed_seconds) +
+        (activities[0].status === 'in_progress'
+          ? Math.max(
+              0,
+              Math.round(
+                (finishedAt.getTime() -
+                  Date.parse(String(activities[0].updated_at))) /
+                  1000,
+              ),
+            )
+          : 0);
       const rows = await request<Record<string, unknown>[]>(
         `activities?id=eq.${encodeURIComponent(activityId)}&user_id=eq.${encodeURIComponent(userId)}`,
         token,
@@ -261,15 +294,18 @@ export function createActivityRepository(
           },
           body: JSON.stringify({
             status: 'completed',
-            ended_at: new Date().toISOString(),
-            elapsed_seconds: summary.elapsedSeconds,
+            ended_at: finishedAt.toISOString(),
+            elapsed_seconds: Math.max(
+              trackedElapsedSeconds,
+              summary.elapsedSeconds,
+            ),
             moving_seconds: summary.movingSeconds,
             distance_m: summary.distanceM,
             elevation_gain_m: summary.elevationGainM,
             average_speed_mps: summary.averageSpeedMps,
             average_pace_seconds_per_km: summary.averagePaceSecondsPerKm,
             calories: summary.calories,
-            updated_at: new Date().toISOString(),
+            updated_at: finishedAt.toISOString(),
           }),
         },
       );
