@@ -44,7 +44,7 @@ export function Screen({
   const content = (
     <Animated.View 
       style={{ opacity: fadeAnim, transform: [{ translateY }] }}
-      className={`mx-auto w-full max-w-xl gap-6 px-6 pt-6 ${scroll ? 'pb-28' : 'pb-0 flex-1'}`}
+      className={`mx-auto w-full max-w-xl gap-6 ${scroll ? '' : 'px-6 pt-6 pb-0 flex-1'}`}
     >
       <View className="flex-row items-start justify-between gap-4">
         <View className="flex-1 gap-2">
@@ -62,9 +62,14 @@ export function Screen({
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-slate-50" edges={['top', 'left', 'right']}>
       {scroll ? (
-        <ScrollView showsVerticalScrollIndicator={false}>{content}</ScrollView>
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          contentContainerClassName="px-6 pt-6 pb-28 flex-grow"
+        >
+          {content}
+        </ScrollView>
       ) : (
         content
       )}

@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import MapView, { Marker, Polyline, type LatLng } from 'react-native-maps';
+import MapView, { Marker, Polyline, type LatLng } from '@/utils/maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, EmptyState } from '@/components/ui/Kit';
