@@ -122,6 +122,7 @@ export async function buildApp(
       .filter(Boolean),
   );
   await app.register(cors, {
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     origin:
       env.NODE_ENV !== 'production'
         ? true

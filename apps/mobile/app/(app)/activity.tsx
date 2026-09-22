@@ -12,9 +12,9 @@ import {
   View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import MapView, { Marker, Polyline, type LatLng } from '@/utils/maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ActivityMap, type ActivityMapHandle, type LatLng } from '@/components/activity/ActivityMap';
 import { Card, EmptyState } from '@/components/ui/Kit';
 import { useAuth } from '@/providers/AuthProvider';
 import {
@@ -106,7 +106,7 @@ function PressScale({
 
 export default function ActivityScreen() {
   const { session } = useAuth();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<ActivityMapHandle>(null);
   const [type, setType] = useState<ActivityType>('run');
   const [active, setActive] = useState<ActivityRecord | null>(null);
   const [history, setHistory] = useState<ActivityRecord[]>([]);
@@ -165,6 +165,23 @@ export default function ActivityScreen() {
       setHistory(items);
       if (current) {
         setType(current.activityType);
+        const savedRoute = current.route ?? [];
+        setRoute(savedRoute);
+        const lastPoint = savedRoute.at(-1);
+        if (lastPoint) {
+          setLocation((previous) => previous ?? {
+            coords: {
+              latitude: lastPoint.latitude,
+              longitude: lastPoint.longitude,
+              altitude: null,
+              accuracy: null,
+              altitudeAccuracy: null,
+              heading: null,
+              speed: null,
+            },
+            timestamp: Date.now(),
+          });
+        }
         if (current.status === 'in_progress') {
           const permission = await Location.getBackgroundPermissionsAsync();
           if (permission.granted) await beginBackgroundTracking(current.id);
@@ -214,10 +231,7 @@ export default function ActivityScreen() {
           longitude: next.coords.longitude,
         };
         setRoute((current) => [...current.slice(-1_999), coordinate]);
-        mapRef.current?.animateCamera(
-          { center: coordinate },
-          { duration: 220 },
-        );
+        mapRef.current?.centerOn(coordinate);
         if (foregroundOnly && session?.access_token)
           void captureForegroundLocation(session.access_token, active.id, next);
       },
@@ -261,15 +275,25 @@ export default function ActivityScreen() {
     setError('');
     try {
       const status = active.status === 'paused' ? 'in_progress' : 'paused';
+      if (status === 'paused') {
+        await pauseBackgroundTracking();
+        const flushed = await flushQueuedActivityPoints(
+          session.access_token,
+          active.id,
+        );
+        if (!flushed) throw new ApiError('Unable to upload queued GPS points');
+      }
       const next = await setActivityStatus(
         session.access_token,
         active.id,
         status,
       );
-      if (status === 'paused') await pauseBackgroundTracking();
-      else if (!foregroundOnly) await beginBackgroundTracking(active.id);
+      if (status === 'in_progress' && !foregroundOnly)
+        await beginBackgroundTracking(active.id);
       setActive(next);
     } catch {
+      if (active.status === 'in_progress' && !foregroundOnly)
+        await beginBackgroundTracking(active.id).catch(() => {});
       setError('เปลี่ยนสถานะกิจกรรมไม่สำเร็จ');
     } finally {
       setBusy(false);
@@ -282,7 +306,14 @@ export default function ActivityScreen() {
     setError('');
     try {
       await pauseBackgroundTracking();
-      await flushQueuedActivityPoints(session.access_token, active.id);
+      const flushed = await flushQueuedActivityPoints(
+        session.access_token,
+        active.id,
+      );
+      if (!flushed)
+        throw new ApiError(
+          'ยังส่งพิกัดที่ค้างอยู่ไม่สำเร็จ กรุณาต่ออินเทอร์เน็ตแล้วกดจบอีกครั้ง',
+        );
       const completed = await finishActivity(session.access_token, active.id);
       await clearBackgroundTracking();
       await clearActivityPointQueue(active.id);
@@ -315,34 +346,16 @@ export default function ActivityScreen() {
   return (
     <View className="flex-1 bg-slate-950">
       <View className="absolute inset-0">
-        {location && Platform.OS !== 'web' ? (
-          <MapView
+        {location ? (
+          <ActivityMap
             ref={mapRef}
-            style={{ flex: 1 }}
-            initialRegion={{
+            location={{
               latitude: location.coords.latitude,
               longitude: location.coords.longitude,
-              latitudeDelta: 0.008,
-              longitudeDelta: 0.008,
             }}
-            showsUserLocation
-            followsUserLocation={active?.status === 'in_progress'}
-            showsCompass={false}
-            toolbarEnabled={false}
-          >
-            {route.length > 1 ? (
-              <Polyline
-                coordinates={route}
-                strokeColor="#10b981"
-                strokeWidth={6}
-                lineCap="round"
-                lineJoin="round"
-              />
-            ) : null}
-            {route[0] ? (
-              <Marker coordinate={route[0]} pinColor="#0f172a" />
-            ) : null}
-          </MapView>
+            route={route}
+            following={active?.status === 'in_progress'}
+          />
         ) : (
           <View className="flex-1 items-center justify-center bg-slate-900">
             <View className="border-primary-500/30 bg-primary-500/10 shadow-primary-500/20 h-20 w-20 items-center justify-center rounded-full border shadow-lg">
@@ -463,16 +476,10 @@ export default function ActivityScreen() {
                 <PressScale
                   onPress={() =>
                     location &&
-                    mapRef.current?.animateCamera(
-                      {
-                        center: {
-                          latitude: location.coords.latitude,
-                          longitude: location.coords.longitude,
-                        },
-                        zoom: 17,
-                      },
-                      { duration: 220 },
-                    )
+                    mapRef.current?.centerOn({
+                      latitude: location.coords.latitude,
+                      longitude: location.coords.longitude,
+                    })
                   }
                   className="h-16 w-16 items-center justify-center rounded-full bg-white/10"
                 >
@@ -603,32 +610,14 @@ export default function ActivityScreen() {
             {history.length ? (
               history.map((item) => (
                 <Card key={item.id}>
-                  {Platform.OS !== 'web' &&
-                  item.route &&
+                  {item.route &&
                   item.route.length > 1 ? (
                     <View className="mb-4 h-32 w-full overflow-hidden rounded-2xl bg-slate-100">
-                      <MapView
-                        style={{ flex: 1 }}
-                        initialRegion={{
-                          latitude: item.route[0]!.latitude,
-                          longitude: item.route[0]!.longitude,
-                          latitudeDelta: 0.015,
-                          longitudeDelta: 0.015,
-                        }}
-                        scrollEnabled={false}
-                        zoomEnabled={false}
-                        pitchEnabled={false}
-                        rotateEnabled={false}
-                        toolbarEnabled={false}
-                      >
-                        <Polyline
-                          coordinates={item.route}
-                          strokeColor="#10b981"
-                          strokeWidth={4}
-                          lineCap="round"
-                          lineJoin="round"
-                        />
-                      </MapView>
+                      <ActivityMap
+                        location={item.route[0]!}
+                        route={item.route}
+                        following={false}
+                      />
                     </View>
                   ) : null}
                   <View className="flex-row items-center">

@@ -78,7 +78,10 @@ function mapActivity(row: Record<string, unknown>): ActivityRecord {
         : numeric(row.average_pace_seconds_per_km),
     calories: numeric(row.calories),
     route: Array.isArray(row.route)
-      ? row.route.map((point) => ({
+      ? [...row.route].sort((left, right) =>
+          numeric((left as Record<string, unknown>).sequence) -
+          numeric((right as Record<string, unknown>).sequence),
+        ).map((point) => ({
           latitude: numeric((point as Record<string, unknown>).latitude),
           longitude: numeric((point as Record<string, unknown>).longitude),
         }))
@@ -129,7 +132,7 @@ export function createActivityRepository(
     return (await response.json()) as T;
   };
   const select =
-    'id,activity_type,status,started_at,ended_at,elapsed_seconds,moving_seconds,distance_m,elevation_gain_m,average_speed_mps,average_pace_seconds_per_km,calories,route:activity_points(latitude,longitude)';
+    'id,activity_type,status,started_at,ended_at,elapsed_seconds,moving_seconds,distance_m,elevation_gain_m,average_speed_mps,average_pace_seconds_per_km,calories,route:activity_points(sequence,latitude,longitude)';
   return {
     async create({ userId, token, type }) {
       const active = await this.current({ userId, token });

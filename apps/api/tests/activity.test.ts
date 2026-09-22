@@ -52,6 +52,32 @@ test('activity endpoints require authentication', async () => {
   await app.close();
 });
 
+test('production CORS preflight allows activity status PATCH', async () => {
+  const app = await buildApp(
+    loadEnv({
+      NODE_ENV: 'production',
+      CORS_ALLOWED_ORIGINS: 'https://help-count-calories-api.vercel.app',
+    }),
+    dependencies(),
+  );
+  const response = await app.inject({
+    method: 'OPTIONS',
+    url: `/api/activities/${record.id}/status`,
+    headers: {
+      origin: 'https://help-count-calories-api.vercel.app',
+      'access-control-request-method': 'PATCH',
+      'access-control-request-headers': 'authorization,content-type',
+    },
+  });
+  assert.equal(response.statusCode, 204);
+  assert.match(response.headers['access-control-allow-methods'] ?? '', /PATCH/);
+  assert.equal(
+    response.headers['access-control-allow-origin'],
+    'https://help-count-calories-api.vercel.app',
+  );
+  await app.close();
+});
+
 test('activity identity comes from the verified token', async () => {
   let userId = '';
   const fake = repository();
@@ -133,4 +159,16 @@ test('calculator measures distance and rejects impossible GPS jumps', () => {
   assert.equal(summary.movingSeconds, 60);
   assert.equal(summary.accepted.length, 2);
   assert.ok(summary.calories > 0);
+});
+
+test('calculator resumes after a long paused gap without adding a jump', () => {
+  const summary = calculateActivity('run', [
+    { sequence: 0, recorded_at: '2026-09-21T00:00:00.000Z', latitude: 13.7563, longitude: 100.5018, accuracy_m: 5, altitude_m: 10, speed_mps: null },
+    { sequence: 1, recorded_at: '2026-09-21T00:00:30.000Z', latitude: 13.7573, longitude: 100.5018, accuracy_m: 5, altitude_m: 10, speed_mps: null },
+    { sequence: 2, recorded_at: '2026-09-21T00:10:00.000Z', latitude: 13.7583, longitude: 100.5018, accuracy_m: 5, altitude_m: 10, speed_mps: null },
+    { sequence: 3, recorded_at: '2026-09-21T00:10:30.000Z', latitude: 13.7593, longitude: 100.5018, accuracy_m: 5, altitude_m: 10, speed_mps: null },
+  ], 70);
+  assert.equal(summary.accepted.length, 4);
+  assert.equal(summary.movingSeconds, 60);
+  assert.ok(summary.distanceM > 200 && summary.distanceM < 230);
 });

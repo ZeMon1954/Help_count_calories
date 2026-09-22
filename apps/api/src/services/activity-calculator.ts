@@ -34,7 +34,13 @@ export function calculateActivity(
     const point = points[index]!;
     const seconds =
       (Date.parse(point.recorded_at) - Date.parse(previous.recorded_at)) / 1000;
-    if (seconds <= 0 || seconds > 120) continue;
+    if (seconds <= 0) continue;
+    // A long gap normally means the user paused tracking. Keep the new point
+    // as the next route anchor without counting the gap or drawing a jump.
+    if (seconds > 120) {
+      accepted.push(point);
+      continue;
+    }
     const segment = distanceMeters(previous, point);
     if (segment / seconds > maximumSpeed) continue;
     accepted.push(point);
