@@ -188,7 +188,7 @@ export default function AddFoodScreen() {
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerClassName="mx-auto w-full max-w-xl gap-5 px-5 pb-12 pt-4"
+          contentContainerClassName="mx-auto w-full max-w-2xl gap-5 px-4 pb-24 pt-4 sm:px-6"
         >
           <Pressable
             accessibilityRole="button"
@@ -319,7 +319,7 @@ export default function AddFoodScreen() {
                   setManual((current) => ({ ...current, name: value }))
                 }
               />
-              <View className="mt-3 flex-row gap-2">
+              <View className="mt-3 gap-3 sm:flex-row">
                 <NumericField
                   label="หนึ่งหน่วย (กรัม)"
                   value={manual.serving_size_g}
@@ -338,7 +338,7 @@ export default function AddFoodScreen() {
                   }
                 />
               </View>
-              <View className="mt-3 flex-row gap-2">
+              <View className="mt-3 gap-3 sm:flex-row">
                 {(['protein_g', 'carbs_g', 'fat_g'] as const).map((key) => (
                   <NumericField
                     key={key}

@@ -1,6 +1,5 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { useEffect, useRef } from 'react';
-import { Animated, Platform, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface ScreenProps extends PropsWithChildren {
@@ -17,48 +16,23 @@ export function Screen({
   scroll = true,
   children,
 }: ScreenProps) {
-  const fadeAnim = useRef(
-    new Animated.Value(Platform.OS === 'web' ? 1 : 0),
-  ).current;
-  const translateY = useRef(
-    new Animated.Value(Platform.OS === 'web' ? 0 : 20),
-  ).current;
-
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.spring(translateY, {
-        toValue: 0,
-        friction: 8,
-        tension: 50,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [fadeAnim, translateY]);
-
   const content = (
-    <Animated.View 
-      style={{ opacity: fadeAnim, transform: [{ translateY }] }}
-      className={`mx-auto w-full max-w-xl gap-6 ${scroll ? '' : 'px-6 pt-6 pb-0 flex-1'}`}
+    <View
+      className={`mx-auto w-full max-w-2xl gap-5 ${scroll ? '' : 'flex-1 px-4 pb-0 pt-4 sm:px-6 sm:pt-6'}`}
     >
-      <View className="flex-row items-start justify-between gap-4">
-        <View className="flex-1 gap-2">
-          <Text className="text-3xl font-extrabold tracking-tight text-slate-900">
+      <View className="flex-row flex-wrap items-start justify-between gap-3">
+        <View className="min-w-0 flex-1 gap-1.5">
+          <Text className="text-[28px] font-extrabold leading-9 tracking-tight text-slate-950">
             {title}
           </Text>
           {subtitle ? (
-            <Text className="text-base font-medium leading-6 text-slate-500">{subtitle}</Text>
+            <Text className="text-[15px] font-medium leading-6 text-slate-500">{subtitle}</Text>
           ) : null}
         </View>
         {action}
       </View>
       {children}
-    </Animated.View>
+    </View>
   );
 
   return (
@@ -66,7 +40,8 @@ export function Screen({
       {scroll ? (
         <ScrollView 
           showsVerticalScrollIndicator={false}
-          contentContainerClassName="px-6 pt-6 pb-28 flex-grow"
+          keyboardShouldPersistTaps="handled"
+          contentContainerClassName="flex-grow px-4 pb-32 pt-4 sm:px-6 sm:pt-6"
         >
           {content}
         </ScrollView>

@@ -108,7 +108,7 @@ export default function NutritionAnalysisScreen() {
       <SectionHeader title="เป้าหมายที่แนะนำ" />
       <Card><View className="gap-3">
         <Text className="text-center text-4xl font-black text-emerald-700">{result.calories}</Text><Text className="text-center text-slate-500">kcal ต่อวัน</Text>
-        <View className="flex-row justify-between"><Text>โปรตีน {result.protein_g} g</Text><Text>คาร์บ {result.carbs_g} g</Text><Text>ไขมัน {result.fat_g} g</Text></View>
+        <View className="gap-3 rounded-2xl bg-slate-50 p-4"><Text>โปรตีน {result.protein_g} g</Text><Text>คาร์บ {result.carbs_g} g</Text><Text>ไขมัน {result.fat_g} g</Text></View>
         <View className="border-t border-slate-100 pt-3"><Text className="text-slate-600">BMR {result.bmr} · TDEE {result.tdee} kcal</Text></View>
         <Text className="leading-6 text-slate-700">{result.explanation}</Text>
         {result.tips.map((tip) => <Text key={tip} className="leading-5 text-slate-600">• {tip}</Text>)}

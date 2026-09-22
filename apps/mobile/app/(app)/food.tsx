@@ -131,8 +131,8 @@ export default function FoodDiaryScreen() {
         >
           <Text className="text-xl font-bold text-slate-700">‹</Text>
         </Pressable>
-        <Pressable onPress={() => setSelectedDate(new Date())}>
-          <Text className="text-lg font-bold text-slate-900">
+        <Pressable className="min-w-0 flex-1 px-2" onPress={() => setSelectedDate(new Date())}>
+          <Text className="text-center text-base font-bold text-slate-900" numberOfLines={2}>
             {dateLabel(selectedDate)}
           </Text>
         </Pressable>
@@ -234,7 +234,7 @@ export default function FoodDiaryScreen() {
                               </Pressable>
                             )}
                           </View>
-                          <View className="items-end gap-1">
+                          <View className="flex-shrink-0 items-end gap-1">
                             <Text className="font-semibold text-slate-700">
                               {Math.round(item.calories)} kcal
                             </Text>
@@ -302,7 +302,7 @@ export default function FoodDiaryScreen() {
                 ] as const
               ).map(([label, value, target, unit]) => (
                 <View key={label} className="gap-2">
-                  <View className="flex-row justify-between">
+                  <View className="flex-row flex-wrap justify-between gap-2">
                     <Text className="text-slate-600">{label}</Text>
                     <Text className="font-semibold text-slate-900">
                       {Math.round(value)} {unit}

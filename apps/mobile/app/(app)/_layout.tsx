@@ -1,19 +1,21 @@
 import { Redirect, Tabs } from 'expo-router';
-import { Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import type { ComponentProps } from 'react';
+import { View } from 'react-native';
 
 import { ProfileStateScreen } from '@/components/profile/ProfileStateScreen';
 import { useAuth } from '@/providers/AuthProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import { resolveProfileRoute } from '@/utils/profile-routing';
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
-  return (
-    <Text
-      className={`text-lg font-bold ${focused ? 'text-emerald-600' : 'text-slate-400'}`}
-    >
-      {label}
-    </Text>
-  );
+function TabIcon({
+  name,
+  color,
+}: {
+  name: ComponentProps<typeof MaterialCommunityIcons>['name'];
+  color: ComponentProps<typeof MaterialCommunityIcons>['color'];
+}) {
+  return <MaterialCommunityIcons name={name} size={24} color={color} />;
 }
 
 export default function ProtectedLayout() {
@@ -36,10 +38,11 @@ export default function ProtectedLayout() {
             tabBarActiveTintColor: '#059669',
             tabBarInactiveTintColor: '#94a3b8',
             tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+            tabBarHideOnKeyboard: true,
             tabBarStyle: {
-              height: 78,
-              paddingBottom: 18,
-              paddingTop: 8,
+              minHeight: 68,
+              paddingBottom: 8,
+              paddingTop: 7,
               borderTopColor: '#e2e8f0',
               backgroundColor: '#ffffff',
             },
@@ -49,45 +52,35 @@ export default function ProtectedLayout() {
             name="home"
             options={{
               title: 'วันนี้',
-              tabBarIcon: ({ focused }) => (
-                <TabIcon focused={focused} label="H" />
-              ),
+              tabBarIcon: ({ color }) => <TabIcon color={color} name="home-variant-outline" />,
             }}
           />
           <Tabs.Screen
             name="food"
             options={{
               title: 'อาหาร',
-              tabBarIcon: ({ focused }) => (
-                <TabIcon focused={focused} label="F" />
-              ),
+              tabBarIcon: ({ color }) => <TabIcon color={color} name="silverware-fork-knife" />,
             }}
           />
           <Tabs.Screen
             name="progress"
             options={{
-              title: 'ความคืบหน้า',
-              tabBarIcon: ({ focused }) => (
-                <TabIcon focused={focused} label="P" />
-              ),
+              title: 'สถิติ',
+              tabBarIcon: ({ color }) => <TabIcon color={color} name="chart-line" />,
             }}
           />
           <Tabs.Screen
             name="activity"
             options={{
               title: 'กิจกรรม',
-              tabBarIcon: ({ focused }) => (
-                <TabIcon focused={focused} label="G" />
-              ),
+              tabBarIcon: ({ color }) => <TabIcon color={color} name="run" />,
             }}
           />
           <Tabs.Screen
             name="profile"
             options={{
               title: 'โปรไฟล์',
-              tabBarIcon: ({ focused }) => (
-                <TabIcon focused={focused} label="U" />
-              ),
+              tabBarIcon: ({ color }) => <TabIcon color={color} name="account-outline" />,
             }}
           />
           <Tabs.Screen name="add-food" options={{ href: null }} />

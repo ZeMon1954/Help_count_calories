@@ -1,7 +1,5 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { useEffect, useRef } from 'react';
 import {
-  Animated,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -22,30 +20,6 @@ export function AuthScaffold({
   footer,
   children,
 }: AuthScaffoldProps) {
-  const fadeAnim = useRef(
-    new Animated.Value(Platform.OS === 'web' ? 1 : 0),
-  ).current;
-  const translateY = useRef(
-    new Animated.Value(Platform.OS === 'web' ? 0 : 20),
-  ).current;
-
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.spring(translateY, {
-        toValue: 0,
-        friction: 8,
-        tension: 50,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [fadeAnim, translateY]);
-
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       <KeyboardAvoidingView
@@ -54,20 +28,19 @@ export function AuthScaffold({
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerClassName="flex-grow justify-center px-6 py-10"
+          contentContainerClassName="flex-grow justify-center px-5 py-8 sm:px-6 sm:py-10"
         >
-          <Animated.View 
-            style={{ opacity: fadeAnim, transform: [{ translateY }] }}
-            className="mx-auto w-full max-w-xl"
+          <View
+            className="mx-auto w-full max-w-md"
           >
-            <View className="mb-10 gap-3">
-              <View className="mb-4 h-16 w-16 items-center justify-center rounded-3xl bg-primary-600 shadow-lg shadow-primary-600/30">
-                <Text className="text-2xl font-black text-white">AI</Text>
+            <View className="mb-8 gap-2">
+              <View className="mb-3 h-14 w-14 items-center justify-center rounded-2xl bg-primary-600 shadow-sm">
+                <Text className="text-xl font-black text-white">AI</Text>
               </View>
-              <Text className="text-4xl font-extrabold tracking-tight text-slate-900">
+              <Text className="text-[32px] font-extrabold leading-10 tracking-tight text-slate-950">
                 {title}
               </Text>
-              <Text className="text-lg font-medium leading-7 text-slate-500">
+              <Text className="text-base font-medium leading-6 text-slate-500">
                 {subtitle}
               </Text>
             </View>
@@ -75,7 +48,7 @@ export function AuthScaffold({
             {footer ? (
               <View className="mt-8 items-center">{footer}</View>
             ) : null}
-          </Animated.View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

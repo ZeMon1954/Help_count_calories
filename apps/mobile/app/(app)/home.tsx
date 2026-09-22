@@ -142,35 +142,37 @@ export default function HomeScreen() {
             )}
           </View>
 
-          <View className="flex-row gap-3">
+          <Card>
             {(
               [
                 ['โปรตีน', consumed.protein_g, summary?.targets.protein_g, 'bg-rose-50 border-rose-100 text-rose-600', 'text-rose-900'],
                 ['คาร์บ', consumed.carbs_g, summary?.targets.carbs_g, 'bg-amber-50 border-amber-100 text-amber-600', 'text-amber-900'],
                 ['ไขมัน', consumed.fat_g, summary?.targets.fat_g, 'bg-blue-50 border-blue-100 text-blue-600', 'text-blue-900'],
               ] as const
-            ).map(([label, value, target, colorClass, textDarkClass]) => (
+            ).map(([label, value, target, , textDarkClass]) => (
               <View
                 key={label}
-                className={`flex-1 gap-2 rounded-3xl border p-4 shadow-sm shadow-slate-100/50 ${colorClass}`}
+                className="flex-row items-center justify-between gap-3 border-b border-slate-100 py-3 last:border-b-0"
               >
-                <Text className={`text-xs font-bold uppercase tracking-wider ${colorClass}`}>{label}</Text>
-                <Text className={`text-2xl font-black ${textDarkClass}`}>
-                  {Math.round(value as number)}<Text className="text-sm font-bold">g</Text>
-                </Text>
-                <Text className={`text-xs font-medium opacity-60 ${textDarkClass}`}>
+                <View className="min-w-0 flex-1">
+                  <Text className={`text-sm font-bold ${textDarkClass}`}>{label}</Text>
+                  <Text className="mt-0.5 text-xs text-slate-500">
                   {target === null || target === undefined
                     ? 'ไม่มีเป้า'
                     : `เป้า ${target}g`}
+                  </Text>
+                </View>
+                <Text className={`text-xl font-black ${textDarkClass}`}>
+                  {Math.round(value as number)}<Text className="text-sm font-bold"> g</Text>
                 </Text>
               </View>
             ))}
-          </View>
+          </Card>
         </>
       )}
 
       <SectionHeader title="เพิ่มอย่างรวดเร็ว" />
-      <View className="flex-row gap-3">
+      <View className="gap-3 sm:flex-row">
         <Pressable
           accessibilityRole="button"
           className="min-h-[88px] flex-1 justify-center rounded-3xl bg-primary-600 p-5 shadow-lg shadow-primary-600/30 active:scale-[0.98]"
@@ -208,8 +210,8 @@ export default function HomeScreen() {
                 <View className="h-10 w-10 items-center justify-center rounded-full bg-slate-100">
                   <Text className="text-lg">🍽️</Text>
                 </View>
-                <View>
-                  <Text className="text-base font-bold text-slate-900">
+                <View className="min-w-0 flex-1">
+                  <Text className="text-base font-bold text-slate-900" numberOfLines={2}>
                     {item.food_name}
                   </Text>
                   <Text className="mt-0.5 text-sm font-medium text-slate-500">
@@ -219,7 +221,7 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               </View>
-              <Text className="text-base font-extrabold text-primary-600">
+              <Text className="flex-shrink-0 text-base font-extrabold text-primary-600">
                 {Math.round(item.calories)} kcal
               </Text>
             </View>

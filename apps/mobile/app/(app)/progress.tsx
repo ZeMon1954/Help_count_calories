@@ -157,16 +157,16 @@ export default function ProgressScreen() {
 
       <Card>
         <Text className="font-bold text-slate-950">บันทึกน้ำหนักวันนี้</Text>
-        <View className="mt-3 flex-row items-center gap-2">
+        <View className="mt-3 gap-3 sm:flex-row sm:items-center">
           <TextInput
             accessibilityLabel="น้ำหนักกิโลกรัม"
-            className="min-h-12 flex-1 rounded-xl border border-slate-300 px-3 text-slate-900"
+            className="min-h-12 rounded-xl border border-slate-300 px-3 text-slate-900 sm:flex-1"
             keyboardType="decimal-pad"
             placeholder="เช่น 70.5"
             value={weight}
             onChangeText={setWeight}
           />
-          <View className="flex-1">
+          <View className="sm:flex-1">
             <ActionButton
               label={saving ? 'กำลังบันทึก...' : 'บันทึก'}
               disabled={saving}
@@ -236,7 +236,7 @@ export default function ProgressScreen() {
               {analysis.nutrition.calories}
             </Text>
             <Text className="text-center text-slate-500">kcal ต่อวัน</Text>
-            <View className="mt-4 flex-row justify-between rounded-2xl bg-slate-50 p-4">
+            <View className="mt-4 gap-3 rounded-2xl bg-slate-50 p-4">
               <Text className="text-slate-700">โปรตีน {analysis.nutrition.protein_g} g</Text>
               <Text className="text-slate-700">คาร์บ {analysis.nutrition.carbs_g} g</Text>
               <Text className="text-slate-700">ไขมัน {analysis.nutrition.fat_g} g</Text>
@@ -278,7 +278,7 @@ export default function ProgressScreen() {
                   labels: weights.slice(-6).map(w => new Date(w.recordedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })),
                   datasets: [{ data: weights.slice(-6).map(w => w.weightKg) }]
                 }}
-                width={Dimensions.get('window').width - 72} // from padding
+                width={Math.min(Dimensions.get('window').width - 64, 600)}
                 height={220}
                 yAxisSuffix=" kg"
                 yAxisInterval={1}

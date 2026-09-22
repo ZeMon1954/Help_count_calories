@@ -23,9 +23,9 @@ const labels = {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <View className="flex-row justify-between gap-4 border-b border-slate-100 py-3 last:border-b-0">
-      <Text className="text-slate-500">{label}</Text>
-      <Text className="flex-1 text-right font-medium text-slate-900">
+    <View className="gap-1 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:justify-between sm:gap-4">
+      <Text className="text-sm text-slate-500">{label}</Text>
+      <Text className="font-medium text-slate-900 sm:flex-1 sm:text-right">
         {value}
       </Text>
     </View>
