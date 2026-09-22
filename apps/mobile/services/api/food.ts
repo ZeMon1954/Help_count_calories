@@ -57,6 +57,11 @@ export interface NutritionSummary {
     carbs_g: number | null;
     fat_g: number | null;
   };
+  exercise?: {
+    calories: number;
+    distanceM: number;
+    movingSeconds: number;
+  };
 }
 
 function authHeaders(accessToken: string) {

@@ -62,6 +62,7 @@ export default function HomeScreen() {
     fat_g: 0,
   };
   const calorieTarget = summary?.targets.calories ?? null;
+  const exerciseCalories = summary?.exercise?.calories ?? 0;
   const remaining =
     calorieTarget === null
       ? null
@@ -112,6 +113,27 @@ export default function HomeScreen() {
                     เป้าหมาย {calorieTarget}
                   </Text>
                 </View>
+                <View className="mt-4 flex-row gap-3 border-t border-white/10 pt-4">
+                  <View className="flex-1">
+                    <Text className="text-xs font-medium text-slate-500">
+                      กินแล้ว
+                    </Text>
+                    <Text className="mt-1 text-lg font-bold text-white">
+                      {Math.round(consumed.calories)} kcal
+                    </Text>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-xs font-medium text-slate-500">
+                      ออกกำลังกาย
+                    </Text>
+                    <Text className="mt-1 text-lg font-bold text-emerald-400">
+                      {Math.round(exerciseCalories)} kcal
+                    </Text>
+                  </View>
+                </View>
+                <Text className="mt-3 text-xs leading-4 text-slate-500">
+                  แคลอรีจากกิจกรรมเป็นค่าประมาณ และไม่ถูกนำมาบวกเพิ่มในโควตาการกินเพื่อป้องกันการนับซ้ำกับระดับกิจกรรม
+                </Text>
               </View>
             ) : (
               <Text className="mt-4 text-sm leading-5 text-amber-400">

@@ -92,6 +92,15 @@ const dependencies = (foodRepository: FoodRepository) => ({
     async createReminder() { throw new Error('not used'); },
     async updateReminder() { return null; }, async deleteReminder() { return false; },
   },
+  activityRepository: {
+    async create() { throw new Error('not used'); },
+    async current() { return null; },
+    async list() { return []; },
+    async totals() { return { calories: 320, distanceM: 5000, movingSeconds: 1800 }; },
+    async appendPoints() { return 0; },
+    async setStatus() { return null; },
+    async finish() { return null; },
+  },
 });
 
 test('food endpoints require authentication', async () => {
@@ -253,6 +262,11 @@ test('nutrition summary totals immutable item snapshots and returns saved target
     protein_g: 140,
     carbs_g: 220,
     fat_g: 60,
+  });
+  assert.deepEqual(response.json().exercise, {
+    calories: 320,
+    distanceM: 5000,
+    movingSeconds: 1800,
   });
   await app.close();
 });

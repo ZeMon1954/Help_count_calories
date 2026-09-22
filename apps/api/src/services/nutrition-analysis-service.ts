@@ -27,12 +27,6 @@ const goalAdjustments: Record<NutritionAnalysisInput['goal'], number> = {
   maintain: 0,
 };
 
-const weeklyChanges: Record<NutritionAnalysisInput['goal'], number> = {
-  lose_fat: -0.4,
-  build_muscle: 0.2,
-  maintain: 0,
-};
-
 export function calculateNutritionTargets(
   input: NutritionAnalysisInput,
 ): NutritionAnalysisResult {
@@ -53,6 +47,8 @@ export function calculateNutritionTargets(
     0,
     Math.round((calories - protein_g * 4 - fat_g * 9) / 4),
   );
+  const weeklyWeightChangeKg =
+    Math.round((((calories - tdee) * 7) / 7_700) * 100) / 100;
   const goalText = {
     lose_fat: 'ลดไขมันโดยรักษามวลกล้ามเนื้อ',
     build_muscle: 'เพิ่มกล้ามเนื้อโดยควบคุมการเพิ่มไขมัน',
@@ -66,7 +62,7 @@ export function calculateNutritionTargets(
     protein_g,
     carbs_g,
     fat_g,
-    weekly_weight_change_kg: weeklyChanges[input.goal],
+    weekly_weight_change_kg: weeklyWeightChangeKg,
     explanation: `เป้าหมายนี้ออกแบบเพื่อ${goalText} โดยเริ่มจากพลังงานที่ร่างกายใช้ประมาณ ${tdee} kcal ต่อวัน`,
     tips: [
       'ติดตามน้ำหนักเฉลี่ย 7 วัน แทนการดูน้ำหนักเพียงวันเดียว',

@@ -29,6 +29,7 @@ function repository(): ActivityRepository {
     create: async () => record,
     current: async () => null,
     list: async () => [],
+    totals: async () => ({ calories: 0, distanceM: 0, movingSeconds: 0 }),
     appendPoints: async ({ points }) => points.length,
     setStatus: async ({ status }) => ({ ...record, status }),
     finish: async () => ({

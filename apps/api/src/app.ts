@@ -834,13 +834,18 @@ export async function buildApp(
         parsed.data.timezone_offset_minutes,
       );
       try {
-        const [logs, settings] = await Promise.all([
+        const [logs, settings, exercise] = await Promise.all([
           foodRepository.getFoodLogs({
             userId: request.authUser!.id,
             accessToken: request.authToken!,
             ...range,
           }),
           settingsRepository.get(request.authUser!.id, request.authToken!),
+          activityRepository.totals({
+            userId: request.authUser!.id,
+            token: request.authToken!,
+            ...range,
+          }),
         ]);
         const totals = logs
           .flatMap((log) => log.items)
@@ -858,6 +863,7 @@ export async function buildApp(
           timezone_offset_minutes: parsed.data.timezone_offset_minutes,
           consumed: totals,
           targets: settings.targets,
+          exercise,
         };
       } catch (error) {
         request.log.warn(

@@ -34,6 +34,12 @@ export interface ActivityRepository {
     token: string;
     limit: number;
   }): Promise<ActivityRecord[]>;
+  totals(input: {
+    userId: string;
+    token: string;
+    startUtc: string;
+    endUtc: string;
+  }): Promise<{ calories: number; distanceM: number; movingSeconds: number }>;
   appendPoints(input: {
     userId: string;
     token: string;
@@ -106,6 +112,7 @@ export function createActivityRepository(
       create: unavailable,
       current: unavailable,
       list: unavailable,
+      totals: unavailable,
       appendPoints: unavailable,
       setStatus: unavailable,
       finish: unavailable,
@@ -183,6 +190,24 @@ export function createActivityRepository(
         token,
       );
       return rows.map(mapActivity);
+    },
+    async totals({ userId, token, startUtc, endUtc }) {
+      const rows = await request<Record<string, unknown>[]>(
+        `activities?select=calories,distance_m,moving_seconds&user_id=eq.${encodeURIComponent(userId)}&status=eq.completed&ended_at=gte.${encodeURIComponent(startUtc)}&ended_at=lt.${encodeURIComponent(endUtc)}`,
+        token,
+      );
+      return rows.reduce<{
+        calories: number;
+        distanceM: number;
+        movingSeconds: number;
+      }>(
+        (sum, row) => ({
+          calories: sum.calories + numeric(row.calories),
+          distanceM: sum.distanceM + numeric(row.distance_m),
+          movingSeconds: sum.movingSeconds + numeric(row.moving_seconds),
+        }),
+        { calories: 0, distanceM: 0, movingSeconds: 0 },
+      );
     },
     async appendPoints({ userId, token, activityId, points }) {
       const active = await request<Record<string, unknown>[]>(
