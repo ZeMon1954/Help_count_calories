@@ -267,9 +267,9 @@ export default function ActivityScreen() {
       try {
         const nextSubscription = await Location.watchPositionAsync(
           {
-            accuracy: Location.Accuracy.High,
+            accuracy: Location.Accuracy.BestForNavigation,
             timeInterval: 5_000,
-            distanceInterval: 5,
+            distanceInterval: 3,
           },
           recordLocation,
         );
@@ -279,7 +279,7 @@ export default function ActivityScreen() {
         // Seed the route without delaying the watcher. Some devices do not
         // call it until the distance threshold has already been crossed.
         void Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
+          accuracy: Location.Accuracy.BestForNavigation,
         })
           .then(recordLocation)
           .catch(() => {
@@ -378,7 +378,6 @@ export default function ActivityScreen() {
       await clearActivityPointQueue(active.id);
       setForegroundOnly(false);
       setActive(null);
-      setLocation(null);
       setRoute([]);
       setHistory((items) => [completed, ...items]);
     } catch (nextError) {
