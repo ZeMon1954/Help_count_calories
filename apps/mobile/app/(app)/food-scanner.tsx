@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import {
@@ -82,6 +83,31 @@ function localImage(asset: ImagePicker.ImagePickerAsset): LocalImage {
   };
 }
 
+async function optimizedLocalImage(
+  asset: ImagePicker.ImagePickerAsset,
+): Promise<LocalImage> {
+  try {
+    const context = ImageManipulator.manipulate(asset.uri);
+    const longestSide = Math.max(asset.width, asset.height);
+    if (longestSide > 1600) {
+      if (asset.width >= asset.height) context.resize({ width: 1600 });
+      else context.resize({ height: 1600 });
+    }
+    const rendered = await context.renderAsync();
+    const saved = await rendered.saveAsync({
+      compress: 0.72,
+      format: SaveFormat.JPEG,
+    });
+    return {
+      uri: saved.uri,
+      mimeType: 'image/jpeg',
+      fileName: `food-${Date.now()}.jpg`,
+    };
+  } catch {
+    return localImage(asset);
+  }
+}
+
 export default function FoodScannerScreen() {
   const { session } = useAuth();
   const [image, setImage] = useState<LocalImage | null>(null);
@@ -108,10 +134,12 @@ export default function FoodScannerScreen() {
   );
   const total = useMemo(() => totalAnalysisItems(editedItems), [editedItems]);
 
-  function acceptAsset(asset: ImagePicker.ImagePickerAsset) {
-    setImage(localImage(asset));
+  async function acceptAsset(asset: ImagePicker.ImagePickerAsset) {
+    setLoading(true);
+    setImage(await optimizedLocalImage(asset));
     setAnalysis(null);
     setError(null);
+    setLoading(false);
   }
 
   async function takePhoto() {
@@ -128,7 +156,7 @@ export default function FoodScannerScreen() {
       allowsEditing: true,
       quality: 0.8,
     });
-    if (!result.canceled && result.assets[0]) acceptAsset(result.assets[0]);
+    if (!result.canceled && result.assets[0]) void acceptAsset(result.assets[0]);
   }
 
   async function choosePhoto() {
@@ -146,7 +174,7 @@ export default function FoodScannerScreen() {
       quality: 0.8,
       selectionLimit: 1,
     });
-    if (!result.canceled && result.assets[0]) acceptAsset(result.assets[0]);
+    if (!result.canceled && result.assets[0]) void acceptAsset(result.assets[0]);
   }
 
   async function analyze() {
@@ -318,7 +346,7 @@ export default function FoodScannerScreen() {
                   กำลังวิเคราะห์อาหาร…
                 </Text>
                 <Text className="text-center text-sm text-slate-500">
-                  โดยปกติใช้เวลาประมาณไม่กี่วินาที กรุณาอย่าปิดหน้านี้
+                  อาจใช้เวลาประมาณ 15–60 วินาที กรุณาอย่าปิดหน้านี้
                 </Text>
               </View>
             </Card>

@@ -24,4 +24,4 @@ services:
       - key: GEMINI_MODEL
         value: gemini-3.8-flash
       - key: AI_REQUEST_TIMEOUT_MS
-        value: 30000
+        value: 60000

@@ -28,7 +28,7 @@ const envSchema = z.object({
     .int()
     .min(1000)
     .max(120000)
-    .default(30000),
+    .default(60000),
 });
 
 export type Env = z.infer<typeof envSchema>;
