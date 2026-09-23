@@ -252,7 +252,7 @@ test('Gemini service sends inline image data and validates structured output', a
   });
   assert.match(
     requestedUrl,
-    /generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-3\.8-flash:generateContent$/,
+    /generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-3\.5-flash-lite:generateContent$/,
   );
   assert.equal(requestedHeaders?.get('x-goog-api-key'), 'test-key');
   assert.equal(
@@ -393,4 +393,26 @@ test('Gemini service retries a temporary provider failure', async () => {
   assert.equal(result.food_name, 'กล้วย');
   assert.equal(calls, 2);
   assert.deepEqual(delays, [250]);
+});
+
+test('Gemini service does not retry a quota response', async () => {
+  let calls = 0;
+  const service = createFoodAnalysisService(
+    loadEnv({ NODE_ENV: 'test', GEMINI_API_KEY: 'test-key' }),
+    async () => {
+      calls += 1;
+      return new Response(null, { status: 429 });
+    },
+  );
+
+  await assert.rejects(
+    service.analyze({
+      bytes: jpegBytes,
+      mimeType: 'image/jpeg',
+      userId: 'verified-user',
+    }),
+    (error: unknown) =>
+      error instanceof FoodAnalysisError && error.code === 'quota_exceeded',
+  );
+  assert.equal(calls, 1);
 });

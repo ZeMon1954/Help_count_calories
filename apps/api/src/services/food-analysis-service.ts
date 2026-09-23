@@ -188,12 +188,12 @@ export function createFoodAnalysisService(
           }),
         };
         let response: Response | undefined;
-        for (let attempt = 0; attempt < 3; attempt += 1) {
+        for (let attempt = 0; attempt < 2; attempt += 1) {
           requestCount += 1;
           response = await fetchImpl(url, requestInit);
           upstreamStatus = response.status;
-          if (response.status !== 429 && response.status < 500) break;
-          if (attempt < 2) await sleep(250 * 2 ** attempt);
+          if (response.status < 500) break;
+          if (attempt < 1) await sleep(250);
         }
         if (!response) throw new FoodAnalysisError('provider_error');
         if (!response.ok) {
