@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const progressQuerySchema = z.object({
   days: z.coerce.number().int().refine((value) => [7, 30, 90].includes(value)),
+  timezone_offset_minutes: z.coerce.number().int().min(-840).max(840).default(0),
 });
 
 export const createMeasurementSchema = z

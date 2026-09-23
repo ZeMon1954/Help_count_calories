@@ -8,6 +8,21 @@ export interface ProgressSnapshot {
     daysWithinTarget: number;
     percentage: number | null;
   };
+  calorieBalance: {
+    totalConsumed: number;
+    totalTarget: number | null;
+    difference: number | null;
+    averageConsumed: number | null;
+    exerciseCalories: number;
+    daysTracked: number;
+    daily: {
+      date: string;
+      consumed: number;
+      target: number | null;
+      difference: number | null;
+      exerciseCalories: number;
+    }[];
+  };
 }
 
 function headers(accessToken: string) {
@@ -15,8 +30,12 @@ function headers(accessToken: string) {
 }
 
 export async function fetchProgress(accessToken: string, days: 7 | 30 | 90) {
+  const query = new URLSearchParams({
+    days: String(days),
+    timezone_offset_minutes: String(-new Date().getTimezoneOffset()),
+  });
   return (
-    await apiRequest<ProgressSnapshot>(`progress?days=${days}`, {
+    await apiRequest<ProgressSnapshot>(`progress?${query.toString()}`, {
       headers: headers(accessToken),
     })
   ).data;

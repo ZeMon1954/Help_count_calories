@@ -17,7 +17,7 @@ import { fetchProgress, saveWeight, type ProgressSnapshot } from '@/services/api
 
 export default function ProgressScreen() {
   const { session } = useAuth();
-  const [days, setDays] = useState<7 | 30 | 90>(30);
+  const [days, setDays] = useState<7 | 30 | 90>(7);
   const [data, setData] = useState<ProgressSnapshot | null>(null);
   const [weight, setWeight] = useState('');
   const [loading, setLoading] = useState(true);
@@ -139,6 +139,8 @@ export default function ProgressScreen() {
   }
 
   const weights = data?.weightHistory ?? [];
+  const balance = data?.calorieBalance;
+  const balanceDifference = balance?.difference ?? null;
   return (
     <Screen title="ความคืบหน้า" subtitle="น้ำหนักและโภชนาการจากข้อมูลจริง">
       <View className="flex-row gap-2">
@@ -299,6 +301,63 @@ export default function ProgressScreen() {
           ) : (
             <EmptyState title="ยังไม่มีข้อมูลน้ำหนัก" description="เพิ่มน้ำหนักรายการแรกได้จากช่องด้านบน" />
           )}
+
+          <SectionHeader title={`สรุปพลังงาน ${days} วัน`} />
+          <Card>
+            {balanceDifference === null ? (
+              <Text className="text-slate-500">
+                ตั้งเป้าแคลอรีและบันทึกอาหารเพื่อดูยอดขาดหรือเกินสะสม
+              </Text>
+            ) : (
+              <View className="gap-4">
+                <View className={`rounded-2xl p-4 ${balanceDifference > 0 ? 'bg-amber-50' : 'bg-emerald-50'}`}>
+                  <Text className={`text-sm font-semibold ${balanceDifference > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                    {balanceDifference > 0 ? 'กินเกินเป้าสะสม' : balanceDifference < 0 ? 'กินต่ำกว่าเป้าสะสม' : 'กินตรงเป้าพอดี'}
+                  </Text>
+                  <Text className={`mt-1 text-3xl font-black ${balanceDifference > 0 ? 'text-amber-900' : 'text-emerald-900'}`}>
+                    {Math.abs(Math.round(balanceDifference)).toLocaleString('th-TH')} kcal
+                  </Text>
+                </View>
+
+                <View className="gap-2">
+                  <View className="flex-row justify-between gap-3">
+                    <Text className="text-slate-500">กินทั้งหมด</Text>
+                    <Text className="font-bold text-slate-900">{Math.round(balance?.totalConsumed ?? 0).toLocaleString('th-TH')} kcal</Text>
+                  </View>
+                  <View className="flex-row justify-between gap-3">
+                    <Text className="text-slate-500">เป้ารวม ({balance?.daysTracked ?? 0} วันที่บันทึก)</Text>
+                    <Text className="font-bold text-slate-900">{Math.round(balance?.totalTarget ?? 0).toLocaleString('th-TH')} kcal</Text>
+                  </View>
+                  <View className="flex-row justify-between gap-3">
+                    <Text className="text-slate-500">ออกกำลังกาย</Text>
+                    <Text className="font-bold text-sky-700">{Math.round(balance?.exerciseCalories ?? 0).toLocaleString('th-TH')} kcal</Text>
+                  </View>
+                </View>
+
+                {(balance?.daily.length ?? 0) > 0 ? (
+                  <View className="border-t border-slate-100 pt-3">
+                    <Text className="mb-2 font-bold text-slate-900">รายวันล่าสุด</Text>
+                    {balance?.daily.slice(-7).map((day) => (
+                      <View key={day.date} className="flex-row items-center justify-between gap-3 border-b border-slate-100 py-2 last:border-b-0">
+                        <Text className="text-sm text-slate-500">
+                          {new Date(`${day.date}T12:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                        </Text>
+                        <Text className={`text-sm font-bold ${day.difference === null ? 'text-slate-400' : day.difference > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                          {day.difference === null
+                            ? `ออก ${Math.round(day.exerciseCalories)} kcal`
+                            : `${day.difference > 0 ? 'เกิน' : day.difference < 0 ? 'ขาด' : 'ตรงเป้า'} ${Math.abs(Math.round(day.difference)).toLocaleString('th-TH')} kcal`}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                <Text className="text-xs leading-5 text-slate-400">
+                  นับเฉพาะวันที่มีบันทึกอาหาร วันที่ไม่มีข้อมูลจะไม่ถูกตีความว่ากิน 0 แคลอรี และแสดงพลังงานออกกำลังกายแยกเพื่อไม่ให้นับกิจกรรมซ้ำกับค่าเป้ารายวัน
+                </Text>
+              </View>
+            )}
+          </Card>
 
           <SectionHeader title="ความสม่ำเสมอของแคลอรี" />
           <Card>

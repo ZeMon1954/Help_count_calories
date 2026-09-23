@@ -63,6 +63,15 @@ const progressRepository: ProgressRepository = {
         daysWithinTarget: 0,
         percentage: null,
       },
+      calorieBalance: {
+        totalConsumed: 0,
+        totalTarget: null,
+        difference: null,
+        averageConsumed: null,
+        exerciseCalories: 0,
+        daysTracked: 0,
+        daily: [],
+      },
     };
   },
   async createMeasurement({ weightKg, recordedAt }) {

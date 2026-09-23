@@ -873,13 +873,24 @@ export async function buildApp(
           error: 'Bad Request',
           message: 'Invalid progress range',
         });
-      const start = new Date();
-      start.setUTCDate(start.getUTCDate() - parsed.data.days);
+      const offsetMs = parsed.data.timezone_offset_minutes * 60_000;
+      const localNow = new Date(Date.now() + offsetMs);
+      const todayLocal = Date.UTC(
+        localNow.getUTCFullYear(),
+        localNow.getUTCMonth(),
+        localNow.getUTCDate(),
+      );
+      const start = new Date(
+        todayLocal - (parsed.data.days - 1) * 86_400_000 - offsetMs,
+      );
+      const end = new Date(todayLocal + 86_400_000 - offsetMs);
       try {
         return await progressRepository.getProgress({
           userId: request.authUser!.id,
           accessToken: request.authToken!,
           startUtc: start.toISOString(),
+          endUtc: end.toISOString(),
+          timezoneOffsetMinutes: parsed.data.timezone_offset_minutes,
         });
       } catch (error) {
         request.log.warn(
