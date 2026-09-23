@@ -82,6 +82,8 @@ export async function apiRequest<T>(
   path: string,
   init?: RequestInit,
   fetchImpl: typeof fetch = fetch,
+  sleep: (milliseconds: number) => Promise<void> = (milliseconds) =>
+    new Promise((resolve) => setTimeout(resolve, milliseconds)),
 ): Promise<ApiResponse<T>> {
   if (!apiBaseUrl) throw new ApiError('EXPO_PUBLIC_API_URL is not configured');
 
@@ -114,6 +116,7 @@ export async function apiRequest<T>(
     normalizedMethod,
     init,
     fetchImpl,
+    sleep,
   );
 
   if (!canUseCache) return request;
@@ -143,15 +146,17 @@ async function performApiRequest<T>(
   method: string,
   init: RequestInit | undefined,
   fetchImpl: typeof fetch,
+  sleep: (milliseconds: number) => Promise<void>,
 ): Promise<ApiResponse<T>> {
   const startedAt = Date.now();
   console.info(`[API] ${method} /${safePath} started`);
 
   let response: Response | undefined;
   let lastError: unknown;
-  const attempts = method === 'GET' ? 2 : 1;
+  const attempts = method === 'GET' ? 3 : 1;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
+    response = undefined;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 75_000);
     const abortFromCaller = () => controller.abort();
@@ -165,11 +170,23 @@ async function performApiRequest<T>(
           headers: { Accept: 'application/json', ...init?.headers },
         },
       );
+      if (
+        attempt + 1 < attempts &&
+        (response.status === 502 ||
+          response.status === 503 ||
+          response.status === 504)
+      ) {
+        console.info(
+          `[API] ${method} /${safePath} received HTTP ${response.status}; retrying while the server starts`,
+        );
+        await sleep(1_500 * 2 ** attempt);
+        continue;
+      }
       break;
     } catch (error) {
       lastError = error;
       if (attempt + 1 < attempts && !init?.signal?.aborted) {
-        await new Promise((resolve) => setTimeout(resolve, 1_500));
+        await sleep(1_500 * 2 ** attempt);
       }
     } finally {
       clearTimeout(timeout);
