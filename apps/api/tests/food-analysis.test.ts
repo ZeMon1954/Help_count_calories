@@ -196,6 +196,7 @@ test('Gemini service sends inline image data and validates structured output', a
   let requestedUrl = '';
   let requestedHeaders: Headers | undefined;
   let requestedBody: Record<string, unknown> | undefined;
+  let recordedUsage: { requestCount: number; totalTokens?: number } | undefined;
   const service = createFoodAnalysisService(
     loadEnv({ NODE_ENV: 'test', GEMINI_API_KEY: 'test-key' }),
     async (input, init) => {
@@ -230,6 +231,11 @@ test('Gemini service sends inline image data and validates structured output', a
               },
             },
           ],
+          usageMetadata: {
+            promptTokenCount: 420,
+            candidatesTokenCount: 80,
+            totalTokenCount: 500,
+          },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
@@ -240,6 +246,9 @@ test('Gemini service sends inline image data and validates structured output', a
     bytes: jpegBytes,
     mimeType: 'image/jpeg',
     userId: 'verified-user',
+    recordUsage: async (event) => {
+      recordedUsage = event;
+    },
   });
   assert.match(
     requestedUrl,
@@ -261,6 +270,8 @@ test('Gemini service sends inline image data and validates structured output', a
     carbs_g: 72,
     fat_g: 24,
   });
+  assert.equal(recordedUsage?.requestCount, 1);
+  assert.equal(recordedUsage?.totalTokens, 500);
 });
 
 test('Gemini service rejects malformed structured output', async () => {

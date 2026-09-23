@@ -1,4 +1,5 @@
 import type { Env } from '../config/env.js';
+import type { RecordAiUsage } from './ai-usage-repository.js';
 import {
   aiPhysiqueAnalysisSchema,
   type AiPhysiqueAnalysis,
@@ -24,6 +25,12 @@ export class PhysiqueAnalysisError extends Error {
 
 interface GeminiEnvelope {
   candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    thoughtsTokenCount?: number;
+    totalTokenCount?: number;
+  };
 }
 
 const responseSchema = {
@@ -62,6 +69,7 @@ export interface PhysiqueAnalysisService {
   analyze(input: {
     bytes: Buffer;
     mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+    recordUsage?: RecordAiUsage;
   }): Promise<AiPhysiqueAnalysis>;
 }
 
@@ -75,6 +83,29 @@ export function createPhysiqueAnalysisService(
     async analyze(input) {
       if (!env.GEMINI_API_KEY)
         throw new PhysiqueAnalysisError('not_configured');
+      const startedAt = performance.now();
+      let requestCount = 0;
+      let upstreamStatus: number | undefined;
+      let usage: GeminiEnvelope['usageMetadata'];
+      let usageRecorded = false;
+      const recordUsage = async (
+        outcome: 'success' | 'quota_exceeded' | 'provider_error' | 'timeout' | 'invalid_response',
+      ) => {
+        if (!input.recordUsage || usageRecorded) return;
+        usageRecorded = true;
+        await input.recordUsage({
+          feature: 'physique_analysis',
+          model: env.GEMINI_MODEL,
+          requestCount: Math.max(1, requestCount),
+          outcome,
+          upstreamStatus,
+          promptTokens: usage?.promptTokenCount,
+          outputTokens: usage?.candidatesTokenCount,
+          thinkingTokens: usage?.thoughtsTokenCount,
+          totalTokens: usage?.totalTokenCount,
+          latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        });
+      };
       const controller = new AbortController();
       const timeout = setTimeout(
         () => controller.abort(),
@@ -113,7 +144,9 @@ export function createPhysiqueAnalysisService(
         };
         let response: Response | undefined;
         for (let attempt = 0; attempt < 3; attempt += 1) {
+          requestCount += 1;
           response = await fetchImpl(url, init);
+          upstreamStatus = response.status;
           if (response.status !== 429 && response.status < 500) break;
           if (attempt < 2) await sleep(250 * 2 ** attempt);
         }
@@ -126,6 +159,7 @@ export function createPhysiqueAnalysisService(
           throw new PhysiqueAnalysisError('provider_error', response.status);
         }
         const envelope = (await response.json()) as GeminiEnvelope;
+        usage = envelope.usageMetadata;
         const text = envelope.candidates?.[0]?.content?.parts
           ?.map((part) => part.text)
           .find((value): value is string => typeof value === 'string');
@@ -139,10 +173,21 @@ export function createPhysiqueAnalysisService(
         const parsed = aiPhysiqueAnalysisSchema.safeParse(json);
         if (!parsed.success)
           throw new PhysiqueAnalysisError('invalid_ai_response');
+        await recordUsage('success');
         if (!parsed.data.photo_suitable)
           throw new PhysiqueAnalysisError('unsuitable_photo');
         return parsed.data;
       } catch (error) {
+        const outcome =
+          error instanceof PhysiqueAnalysisError && error.code === 'quota_exceeded'
+            ? 'quota_exceeded'
+            : (error instanceof PhysiqueAnalysisError && error.code === 'timeout') ||
+                (error instanceof Error && error.name === 'AbortError')
+              ? 'timeout'
+              : error instanceof PhysiqueAnalysisError && error.code === 'invalid_ai_response'
+                ? 'invalid_response'
+                : 'provider_error';
+        await recordUsage(outcome);
         if (error instanceof PhysiqueAnalysisError) throw error;
         if (error instanceof Error && error.name === 'AbortError')
           throw new PhysiqueAnalysisError('timeout');

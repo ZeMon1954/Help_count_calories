@@ -79,6 +79,11 @@ import {
   createActivityRepository,
   type ActivityRepository,
 } from './services/activity-repository.js';
+import {
+  createAiUsageRepository,
+  type AiUsageRepository,
+  type RecordAiUsage,
+} from './services/ai-usage-repository.js';
 
 interface AppDependencies {
   checkDatabase?: (env: Env) => Promise<DatabaseHealthResult>;
@@ -91,6 +96,7 @@ interface AppDependencies {
   activityRepository?: ActivityRepository;
   nutritionAnalysisService?: NutritionAnalysisService;
   physiqueAnalysisService?: PhysiqueAnalysisService;
+  aiUsageRepository?: AiUsageRepository;
 }
 
 const FOOD_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
@@ -120,6 +126,19 @@ export async function buildApp(
     createNutritionAnalysisService(env);
   const physiqueAnalysisService =
     dependencies.physiqueAnalysisService ?? createPhysiqueAnalysisService(env);
+  const aiUsageRepository =
+    dependencies.aiUsageRepository ?? createAiUsageRepository(env);
+  const usageRecorder = (userId: string, accessToken: string): RecordAiUsage =>
+    async (event) => {
+      try {
+        await aiUsageRepository.record({ ...event, userId, accessToken });
+      } catch (error) {
+        app.log.warn(
+          { feature: event.feature, loggingError: error instanceof Error },
+          'Unable to persist AI usage log',
+        );
+      }
+    };
   const analysisRequests = new Map<string, number[]>();
 
   await app.register(sensible);
@@ -158,7 +177,12 @@ export async function buildApp(
           message: 'Invalid nutrition analysis data',
         });
       }
-      return nutritionAnalysisService.analyze(parsed.data);
+      return nutritionAnalysisService.analyze(parsed.data, {
+        recordUsage: usageRecorder(
+          request.authUser!.id,
+          request.authToken!,
+        ),
+      });
     },
   );
 
@@ -258,6 +282,10 @@ export async function buildApp(
         const visual = await physiqueAnalysisService.analyze({
           bytes,
           mimeType: file.mimetype,
+          recordUsage: usageRecorder(
+            request.authUser!.id,
+            request.authToken!,
+          ),
         });
         const measurement = await progressRepository.createMeasurement({
           userId: request.authUser!.id,
@@ -1285,6 +1313,7 @@ export async function buildApp(
           bytes,
           mimeType: file.mimetype,
           userId,
+          recordUsage: usageRecorder(userId, request.authToken!),
         });
         return reply.code(200).send(result);
       } catch (error) {

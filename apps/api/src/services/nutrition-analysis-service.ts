@@ -1,5 +1,6 @@
 import type { Env } from '../config/env.js';
 import type { NutritionAnalysisInput } from '../schemas/nutrition-analysis.js';
+import type { RecordAiUsage } from './ai-usage-repository.js';
 
 export interface NutritionAnalysisResult {
   bmr: number;
@@ -75,10 +76,19 @@ export function calculateNutritionTargets(
 
 interface GeminiEnvelope {
   candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    thoughtsTokenCount?: number;
+    totalTokenCount?: number;
+  };
 }
 
 export interface NutritionAnalysisService {
-  analyze(input: NutritionAnalysisInput): Promise<NutritionAnalysisResult>;
+  analyze(
+    input: NutritionAnalysisInput,
+    context?: { recordUsage?: RecordAiUsage },
+  ): Promise<NutritionAnalysisResult>;
 }
 
 export function createNutritionAnalysisService(
@@ -86,10 +96,12 @@ export function createNutritionAnalysisService(
   fetchImpl: typeof fetch = fetch,
 ): NutritionAnalysisService {
   return {
-    async analyze(input) {
+    async analyze(input, context) {
       const result = calculateNutritionTargets(input);
       if (!env.GEMINI_API_KEY) return result;
 
+      const startedAt = performance.now();
+      let status: number | undefined;
       try {
         const model = encodeURIComponent(env.GEMINI_MODEL);
         const response = await fetchImpl(
@@ -122,25 +134,76 @@ export function createNutritionAnalysisService(
             }),
           },
         );
-        if (!response.ok) return result;
+        status = response.status;
+        if (!response.ok) {
+          await context?.recordUsage?.({
+            feature: 'nutrition_analysis',
+            model: env.GEMINI_MODEL,
+            requestCount: 1,
+            outcome: response.status === 429 ? 'quota_exceeded' : 'provider_error',
+            upstreamStatus: response.status,
+            latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+          });
+          return result;
+        }
         const envelope = (await response.json()) as GeminiEnvelope;
         const text = envelope.candidates?.[0]?.content?.parts?.find(
           (part) => typeof part.text === 'string',
         )?.text;
-        if (typeof text !== 'string') return result;
+        if (typeof text !== 'string') {
+          await context?.recordUsage?.({
+            feature: 'nutrition_analysis', model: env.GEMINI_MODEL, requestCount: 1,
+            outcome: 'invalid_response', upstreamStatus: status,
+            promptTokens: envelope.usageMetadata?.promptTokenCount,
+            outputTokens: envelope.usageMetadata?.candidatesTokenCount,
+            thinkingTokens: envelope.usageMetadata?.thoughtsTokenCount,
+            totalTokens: envelope.usageMetadata?.totalTokenCount,
+            latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+          });
+          return result;
+        }
         const parsed = JSON.parse(text) as { explanation?: unknown; tips?: unknown };
         if (
           typeof parsed.explanation !== 'string' ||
           !Array.isArray(parsed.tips) ||
           !parsed.tips.every((tip) => typeof tip === 'string')
-        ) return result;
+        ) {
+          await context?.recordUsage?.({
+            feature: 'nutrition_analysis',
+            model: env.GEMINI_MODEL,
+            requestCount: 1,
+            outcome: 'invalid_response',
+            upstreamStatus: status,
+            promptTokens: envelope.usageMetadata?.promptTokenCount,
+            outputTokens: envelope.usageMetadata?.candidatesTokenCount,
+            thinkingTokens: envelope.usageMetadata?.thoughtsTokenCount,
+            totalTokens: envelope.usageMetadata?.totalTokenCount,
+            latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+          });
+          return result;
+        }
+        await context?.recordUsage?.({
+          feature: 'nutrition_analysis', model: env.GEMINI_MODEL, requestCount: 1,
+          outcome: 'success', upstreamStatus: status,
+          promptTokens: envelope.usageMetadata?.promptTokenCount,
+          outputTokens: envelope.usageMetadata?.candidatesTokenCount,
+          thinkingTokens: envelope.usageMetadata?.thoughtsTokenCount,
+          totalTokens: envelope.usageMetadata?.totalTokenCount,
+          latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        });
         return {
           ...result,
           explanation: parsed.explanation.slice(0, 1000),
           tips: parsed.tips.slice(0, 4).map((tip) => tip.slice(0, 300)),
           ai_generated: true,
         };
-      } catch {
+      } catch (error) {
+        await context?.recordUsage?.({
+          feature: 'nutrition_analysis', model: env.GEMINI_MODEL, requestCount: 1,
+          outcome: error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'provider_error',
+          upstreamStatus: status,
+          latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        }).catch(() => undefined);
         return result;
       }
     },
