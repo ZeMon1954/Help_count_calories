@@ -14,7 +14,11 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ActivityMap, type ActivityMapHandle, type LatLng } from '@/components/activity/ActivityMap';
+import {
+  ActivityMap,
+  type ActivityMapHandle,
+  type LatLng,
+} from '@/components/activity/ActivityMap';
 import { Card, EmptyState } from '@/components/ui/Kit';
 import { useAuth } from '@/providers/AuthProvider';
 import {
@@ -123,6 +127,7 @@ export default function ActivityScreen() {
   const [showHistory, setShowHistory] = useState(false);
   const [panelVisible, setPanelVisible] = useState(true);
   const panelAnim = useRef(new Animated.Value(0)).current;
+  const lastLocationTimestamp = useRef(0);
 
   const togglePanel = useCallback(() => {
     Animated.spring(panelAnim, {
@@ -170,18 +175,21 @@ export default function ActivityScreen() {
         setRoute(savedRoute);
         const lastPoint = savedRoute.at(-1);
         if (lastPoint) {
-          setLocation((previous) => previous ?? {
-            coords: {
-              latitude: lastPoint.latitude,
-              longitude: lastPoint.longitude,
-              altitude: null,
-              accuracy: null,
-              altitudeAccuracy: null,
-              heading: null,
-              speed: null,
-            },
-            timestamp: Date.now(),
-          });
+          setLocation(
+            (previous) =>
+              previous ?? {
+                coords: {
+                  latitude: lastPoint.latitude,
+                  longitude: lastPoint.longitude,
+                  altitude: null,
+                  accuracy: null,
+                  altitudeAccuracy: null,
+                  heading: null,
+                  speed: null,
+                },
+                timestamp: Date.now(),
+              },
+          );
         }
         if (current.status === 'in_progress') {
           const permission = await Location.getBackgroundPermissionsAsync();
@@ -226,27 +234,69 @@ export default function ActivityScreen() {
   useEffect(() => {
     if (!active || active.status !== 'in_progress') return;
     let subscription: Location.LocationSubscription | undefined;
-    void Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.High,
-        timeInterval: 5_000,
-        distanceInterval: 5,
-      },
-      (next) => {
-        setLocation(next);
-        const coordinate = {
-          latitude: next.coords.latitude,
-          longitude: next.coords.longitude,
-        };
-        setRoute((current) => [...current.slice(-1_999), coordinate]);
-        mapRef.current?.centerOn(coordinate);
-        if (foregroundOnly && session?.access_token)
-          void captureForegroundLocation(session.access_token, active.id, next);
-      },
-    ).then((value) => {
-      subscription = value;
-    });
-    return () => subscription?.remove();
+    let cancelled = false;
+
+    const recordLocation = (next: Location.LocationObject) => {
+      if (cancelled || next.timestamp <= lastLocationTimestamp.current) return;
+      lastLocationTimestamp.current = next.timestamp;
+      setLocation(next);
+      const coordinate = {
+        latitude: next.coords.latitude,
+        longitude: next.coords.longitude,
+      };
+      setRoute((current) => [...current.slice(-1_999), coordinate]);
+      mapRef.current?.centerOn(coordinate);
+      if (foregroundOnly && session?.access_token) {
+        void captureForegroundLocation(session.access_token, active.id, next)
+          .then((uploaded) => {
+            if (!uploaded && !cancelled)
+              setError(
+                'บันทึกพิกัดไว้ในเครื่องแล้ว และจะลองส่งใหม่ตอนจบกิจกรรม',
+              );
+          })
+          .catch(() => {
+            if (!cancelled)
+              setError(
+                'บันทึกพิกัดไว้ในเครื่องไม่สำเร็จ กรุณาตรวจพื้นที่ว่างของอุปกรณ์',
+              );
+          });
+      }
+    };
+
+    const startWatcher = async () => {
+      try {
+        const nextSubscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.BestForNavigation,
+            timeInterval: 5_000,
+            distanceInterval: 3,
+          },
+          recordLocation,
+        );
+        if (cancelled) nextSubscription.remove();
+        else subscription = nextSubscription;
+
+        // Seed the route without delaying the watcher. Some devices do not
+        // call it until the distance threshold has already been crossed.
+        void Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.BestForNavigation,
+        })
+          .then(recordLocation)
+          .catch(() => {
+            // The active watcher can still supply the first location.
+          });
+      } catch {
+        if (!cancelled)
+          setError('GPS ไม่ส่งพิกัด กรุณาเปิดตำแหน่งแบบแม่นยำแล้วลองเริ่มใหม่');
+      }
+    };
+
+    lastLocationTimestamp.current = 0;
+    void startWatcher();
+    return () => {
+      cancelled = true;
+      subscription?.remove();
+    };
   }, [active, foregroundOnly, session?.access_token]);
 
   async function begin() {
@@ -328,7 +378,6 @@ export default function ActivityScreen() {
       await clearActivityPointQueue(active.id);
       setForegroundOnly(false);
       setActive(null);
-      setLocation(null);
       setRoute([]);
       setHistory((items) => [completed, ...items]);
     } catch (nextError) {
@@ -345,8 +394,7 @@ export default function ActivityScreen() {
 
   function confirmFinish() {
     const title = 'จบกิจกรรม?';
-    const message =
-      'ระบบจะคำนวณและบันทึกผลการออกกำลังกายครั้งนี้';
+    const message = 'ระบบจะคำนวณและบันทึกผลการออกกำลังกายครั้งนี้';
 
     // React Native Web's Alert implementation does not reliably invoke
     // callbacks for multi-button alerts. Use the browser confirmation dialog
@@ -630,8 +678,7 @@ export default function ActivityScreen() {
             {history.length ? (
               history.map((item) => (
                 <Card key={item.id}>
-                  {item.route &&
-                  item.route.length > 1 ? (
+                  {item.route && item.route.length > 1 ? (
                     <View className="mb-4 h-32 w-full overflow-hidden rounded-2xl bg-slate-100">
                       <ActivityMap
                         location={item.route[0]!}
