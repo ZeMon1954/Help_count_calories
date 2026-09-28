@@ -159,18 +159,22 @@ export function createFoodAnalysisService(
       ) => {
         if (!input.recordUsage || usageRecorded) return;
         usageRecorded = true;
-        await input.recordUsage({
-          feature: 'food_analysis',
-          model: env.GEMINI_MODEL,
-          requestCount: Math.max(1, requestCount),
-          outcome,
-          upstreamStatus,
-          promptTokens: usage?.promptTokenCount,
-          outputTokens: usage?.candidatesTokenCount,
-          thinkingTokens: usage?.thoughtsTokenCount,
-          totalTokens: usage?.totalTokenCount,
-          latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
-        });
+        try {
+          await input.recordUsage({
+            feature: 'food_analysis',
+            model: env.GEMINI_MODEL,
+            requestCount: Math.max(1, requestCount),
+            outcome,
+            upstreamStatus,
+            promptTokens: usage?.promptTokenCount,
+            outputTokens: usage?.candidatesTokenCount,
+            thinkingTokens: usage?.thoughtsTokenCount,
+            totalTokens: usage?.totalTokenCount,
+            latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+          });
+        } catch {
+          // Usage telemetry must never turn a successful analysis into a failure.
+        }
       };
       const controller = new AbortController();
       const timeout = setTimeout(

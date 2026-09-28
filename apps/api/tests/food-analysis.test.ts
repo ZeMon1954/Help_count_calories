@@ -447,3 +447,53 @@ test('Gemini service preserves safe provider diagnostics for configuration error
         'NOT_FOUND: The requested model was not found',
   );
 });
+
+test('Gemini analysis succeeds when usage telemetry is unavailable', async () => {
+  const service = createFoodAnalysisService(
+    loadEnv({ NODE_ENV: 'test', GEMINI_API_KEY: 'test-key' }),
+    async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      is_food: true,
+                      food_name: 'Chicken burger',
+                      items: [
+                        {
+                          name: 'Chicken burger',
+                          estimated_quantity_g: 150,
+                          calories: 300,
+                          protein_g: 15,
+                          carbs_g: 38,
+                          fat_g: 11,
+                        },
+                      ],
+                      confidence: 'high',
+                      warnings: [],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+  );
+
+  const result = await service.analyze({
+    bytes: jpegBytes,
+    mimeType: 'image/jpeg',
+    userId: 'verified-user',
+    recordUsage: async () => {
+      throw new Error('AI usage log failed (503)');
+    },
+  });
+
+  assert.equal(result.food_name, 'Chicken burger');
+  assert.equal(result.total.calories, 300);
+});
