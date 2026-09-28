@@ -91,7 +91,21 @@ const analysisRateWindowMs = 15 * 60 * 1000;
 const analysisRateLimit = 10;
 
 export function registerFoodAnalysisRoutes(context: RouteContext) {
-  const { app, env, checkDatabase, profileRepository, foodRepository, foodAnalysisService, progressRepository, settingsRepository, activityRepository, nutritionAnalysisService, physiqueAnalysisService, usageRecorder, analysisRequests } = context;
+  const {
+    app,
+    env,
+    checkDatabase,
+    profileRepository,
+    foodRepository,
+    foodAnalysisService,
+    progressRepository,
+    settingsRepository,
+    activityRepository,
+    nutritionAnalysisService,
+    physiqueAnalysisService,
+    usageRecorder,
+    analysisRequests,
+  } = context;
 
   app.post(
     '/api/food-analyses',
@@ -234,7 +248,12 @@ export function registerFoodAnalysisRoutes(context: RouteContext) {
             error: errorName,
           } = responses[error.code];
           request.log.warn(
-            { code, upstreamStatus: error.upstreamStatus },
+            {
+              code,
+              upstreamStatus: error.upstreamStatus,
+              upstreamDiagnostic: error.upstreamDiagnostic,
+              model: env.GEMINI_MODEL,
+            },
             'Food analysis failed',
           );
           return reply.code(statusCode).send({
@@ -255,6 +274,4 @@ export function registerFoodAnalysisRoutes(context: RouteContext) {
       }
     },
   );
-
 }
-

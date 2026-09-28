@@ -416,3 +416,34 @@ test('Gemini service does not retry a quota response', async () => {
   );
   assert.equal(calls, 1);
 });
+
+test('Gemini service preserves safe provider diagnostics for configuration errors', async () => {
+  const service = createFoodAnalysisService(
+    loadEnv({ NODE_ENV: 'test', GEMINI_API_KEY: 'test-key' }),
+    async () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            code: 404,
+            status: 'NOT_FOUND',
+            message: 'The requested model was not found',
+          },
+        }),
+        { status: 404, headers: { 'content-type': 'application/json' } },
+      ),
+  );
+
+  await assert.rejects(
+    service.analyze({
+      bytes: jpegBytes,
+      mimeType: 'image/jpeg',
+      userId: 'verified-user',
+    }),
+    (error: unknown) =>
+      error instanceof FoodAnalysisError &&
+      error.code === 'not_configured' &&
+      error.upstreamStatus === 404 &&
+      error.upstreamDiagnostic ===
+        'NOT_FOUND: The requested model was not found',
+  );
+});

@@ -18,9 +18,27 @@ export class FoodAnalysisError extends Error {
   constructor(
     readonly code: FoodAnalysisErrorCode,
     readonly upstreamStatus?: number,
+    readonly upstreamDiagnostic?: string,
   ) {
     super(code);
     this.name = 'FoodAnalysisError';
+  }
+}
+
+async function readGeminiError(response: Response) {
+  try {
+    const body = (await response.json()) as {
+      error?: { message?: unknown; status?: unknown };
+    };
+    const message =
+      typeof body.error?.message === 'string' ? body.error.message : undefined;
+    const status =
+      typeof body.error?.status === 'string' ? body.error.status : undefined;
+    return (
+      [status, message].filter(Boolean).join(': ').slice(0, 500) || undefined
+    );
+  } catch {
+    return undefined;
   }
 }
 
@@ -132,7 +150,12 @@ export function createFoodAnalysisService(
       let usage: GeminiResponse['usageMetadata'];
       let usageRecorded = false;
       const recordUsage = async (
-        outcome: 'success' | 'quota_exceeded' | 'provider_error' | 'timeout' | 'invalid_response',
+        outcome:
+          | 'success'
+          | 'quota_exceeded'
+          | 'provider_error'
+          | 'timeout'
+          | 'invalid_response',
       ) => {
         if (!input.recordUsage || usageRecorded) return;
         usageRecorded = true;
@@ -197,11 +220,29 @@ export function createFoodAnalysisService(
         }
         if (!response) throw new FoodAnalysisError('provider_error');
         if (!response.ok) {
+          const diagnostic = await readGeminiError(response);
           if (response.status === 429)
-            throw new FoodAnalysisError('quota_exceeded', response.status);
-          if (response.status === 401 || response.status === 403)
-            throw new FoodAnalysisError('not_configured', response.status);
-          throw new FoodAnalysisError('provider_error', response.status);
+            throw new FoodAnalysisError(
+              'quota_exceeded',
+              response.status,
+              diagnostic,
+            );
+          if (
+            response.status === 400 ||
+            response.status === 401 ||
+            response.status === 403 ||
+            response.status === 404
+          )
+            throw new FoodAnalysisError(
+              'not_configured',
+              response.status,
+              diagnostic,
+            );
+          throw new FoodAnalysisError(
+            'provider_error',
+            response.status,
+            diagnostic,
+          );
         }
 
         const envelope = (await response.json()) as GeminiResponse;
@@ -226,10 +267,12 @@ export function createFoodAnalysisService(
         const outcome =
           error instanceof FoodAnalysisError && error.code === 'quota_exceeded'
             ? 'quota_exceeded'
-            : (error instanceof FoodAnalysisError && error.code === 'timeout') ||
+            : (error instanceof FoodAnalysisError &&
+                  error.code === 'timeout') ||
                 (error instanceof Error && error.name === 'AbortError')
               ? 'timeout'
-              : error instanceof FoodAnalysisError && error.code === 'invalid_ai_response'
+              : error instanceof FoodAnalysisError &&
+                  error.code === 'invalid_ai_response'
                 ? 'invalid_response'
                 : 'provider_error';
         await recordUsage(outcome);
