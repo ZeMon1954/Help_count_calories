@@ -252,7 +252,8 @@ export function registerFoodAnalysisRoutes(context: RouteContext) {
               code,
               upstreamStatus: error.upstreamStatus,
               upstreamDiagnostic: error.upstreamDiagnostic,
-              model: env.GEMINI_MODEL,
+              primaryModel: env.GEMINI_MODEL,
+              fallbackModel: env.GEMINI_FALLBACK_MODEL,
             },
             'Food analysis failed',
           );

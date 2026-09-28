@@ -146,6 +146,7 @@ export function createFoodAnalysisService(
 
       const startedAt = performance.now();
       let requestCount = 0;
+      let requestedModel = env.GEMINI_MODEL;
       let upstreamStatus: number | undefined;
       let usage: GeminiResponse['usageMetadata'];
       let usageRecorded = false;
@@ -162,7 +163,7 @@ export function createFoodAnalysisService(
         try {
           await input.recordUsage({
             feature: 'food_analysis',
-            model: env.GEMINI_MODEL,
+            model: requestedModel,
             requestCount: Math.max(1, requestCount),
             outcome,
             upstreamStatus,
@@ -182,8 +183,6 @@ export function createFoodAnalysisService(
         env.AI_REQUEST_TIMEOUT_MS,
       );
       try {
-        const model = encodeURIComponent(env.GEMINI_MODEL);
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
         const requestInit: RequestInit = {
           method: 'POST',
           headers: {
@@ -216,6 +215,10 @@ export function createFoodAnalysisService(
         };
         let response: Response | undefined;
         for (let attempt = 0; attempt < 2; attempt += 1) {
+          requestedModel =
+            attempt === 0 ? env.GEMINI_MODEL : env.GEMINI_FALLBACK_MODEL;
+          const model = encodeURIComponent(requestedModel);
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
           requestCount += 1;
           response = await fetchImpl(url, requestInit);
           upstreamStatus = response.status;

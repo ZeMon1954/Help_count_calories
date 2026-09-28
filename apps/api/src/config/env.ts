@@ -23,6 +23,7 @@ const envSchema = z.object({
   // Backward-compatible alias used by the original local setup.
   AI_API_KEY: optionalSecret.optional(),
   GEMINI_MODEL: z.string().min(1).default('gemini-3.5-flash-lite'),
+  GEMINI_FALLBACK_MODEL: z.string().min(1).default('gemini-3.1-flash-lite'),
   AI_REQUEST_TIMEOUT_MS: z.coerce
     .number()
     .int()

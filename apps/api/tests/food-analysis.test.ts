@@ -341,11 +341,13 @@ test('Gemini service maps a non-food response with an empty name correctly', asy
 
 test('Gemini service retries a temporary provider failure', async () => {
   let calls = 0;
+  const requestedUrls: string[] = [];
   const delays: number[] = [];
   const service = createFoodAnalysisService(
     loadEnv({ NODE_ENV: 'test', GEMINI_API_KEY: 'test-key' }),
-    async () => {
+    async (input) => {
       calls += 1;
+      requestedUrls.push(input.toString());
       if (calls === 1) return new Response(null, { status: 503 });
       return new Response(
         JSON.stringify({
@@ -393,6 +395,8 @@ test('Gemini service retries a temporary provider failure', async () => {
   assert.equal(result.food_name, 'กล้วย');
   assert.equal(calls, 2);
   assert.deepEqual(delays, [250]);
+  assert.match(requestedUrls[0]!, /gemini-3\.5-flash-lite/);
+  assert.match(requestedUrls[1]!, /gemini-3\.1-flash-lite/);
 });
 
 test('Gemini service does not retry a quota response', async () => {
