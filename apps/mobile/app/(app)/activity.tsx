@@ -212,17 +212,19 @@ export default function ActivityScreen() {
       setElapsed(0);
       return;
     }
+    // Device clocks can run behind the server. If updatedAt is "in the future"
+    // relative to this device, anchor to now so the timer never sits at zero.
+    const anchor = Math.min(
+      Date.parse(active.updatedAt ?? active.startedAt) || Date.now(),
+      Date.now(),
+    );
     const update = () =>
       setElapsed(
         Math.max(
           0,
           active.elapsedSeconds +
             (active.status === 'in_progress'
-              ? Math.floor(
-                  (Date.now() -
-                    Date.parse(active.updatedAt ?? active.startedAt)) /
-                    1000,
-                )
+              ? Math.floor((Date.now() - anchor) / 1000)
               : 0),
         ),
       );

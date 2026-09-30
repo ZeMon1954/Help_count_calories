@@ -4,6 +4,13 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, Pressable, Text, TextInput, View } from 'react-native';
 import { LineChart, ProgressChart } from 'react-native-chart-kit';
 
+import { PlanSetupCard } from '@/components/stats/PlanSetupCard';
+import {
+  GoalCard,
+  ProjectionCard,
+  TodayCard,
+  ZoneCard,
+} from '@/components/stats/PlanSummary';
 import { ActionButton, Card, EmptyState, SectionHeader } from '@/components/ui/Kit';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/providers/AuthProvider';
@@ -14,11 +21,20 @@ import {
   type PhysiqueAnalysisResult,
 } from '@/services/api/physique-analysis';
 import { fetchProgress, saveWeight, type ProgressSnapshot } from '@/services/api/progress';
+import {
+  fetchWeightPlan,
+  saveWeightPlan,
+  type WeightPlanInput,
+  type WeightPlanSnapshot,
+} from '@/services/api/weight-plan';
 
 export default function ProgressScreen() {
   const { session } = useAuth();
   const [days, setDays] = useState<7 | 30 | 90>(7);
   const [data, setData] = useState<ProgressSnapshot | null>(null);
+  const [planData, setPlanData] = useState<WeightPlanSnapshot | null>(null);
+  const [editingPlan, setEditingPlan] = useState(false);
+  const [savingPlan, setSavingPlan] = useState(false);
   const [weight, setWeight] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,7 +49,14 @@ export default function ProgressScreen() {
     setLoading(true);
     setError('');
     try {
-      setData(await fetchProgress(session.access_token, days));
+      const [progress, plan] = await Promise.all([
+        fetchProgress(session.access_token, days),
+        // The plan is an add-on: if it is unavailable the rest of the page
+        // (weights, energy summary) should still load.
+        fetchWeightPlan(session.access_token).catch(() => null),
+      ]);
+      setData(progress);
+      setPlanData(plan);
     } catch {
       setError('โหลดข้อมูลความคืบหน้าไม่สำเร็จ');
     } finally {
@@ -42,6 +65,25 @@ export default function ProgressScreen() {
   }, [days, session?.access_token]);
 
   useFocusEffect(useCallback(() => void load(), [load]));
+
+  async function submitPlan(input: WeightPlanInput) {
+    if (!session?.access_token || savingPlan) return;
+    setSavingPlan(true);
+    setError('');
+    try {
+      await saveWeightPlan(session.access_token, input);
+      setEditingPlan(false);
+      await load();
+    } catch (nextError) {
+      setError(
+        nextError instanceof ApiError && nextError.status === 400
+          ? 'บันทึกแผนไม่สำเร็จ กรุณาบันทึกน้ำหนักปัจจุบันก่อน'
+          : 'บันทึกแผนไม่สำเร็จ กรุณาลองอีกครั้ง',
+      );
+    } finally {
+      setSavingPlan(false);
+    }
+  }
 
   async function addWeight() {
     if (!session?.access_token || saving) return;
@@ -142,20 +184,46 @@ export default function ProgressScreen() {
   const balance = data?.calorieBalance;
   const balanceDifference = balance?.difference ?? null;
   return (
-    <Screen title="ความคืบหน้า" subtitle="น้ำหนักและโภชนาการจากข้อมูลจริง">
-      <View className="flex-row gap-2">
-        {([7, 30, 90] as const).map((value) => (
-          <Pressable
-            key={value}
-            className={`min-h-11 flex-1 items-center justify-center rounded-xl ${days === value ? 'bg-emerald-600' : 'border border-slate-300 bg-white'}`}
-            onPress={() => setDays(value)}
-          >
-            <Text className={days === value ? 'text-white' : 'text-slate-700'}>
-              {value} วัน
+    <Screen title="สถิติ" subtitle="วันนี้กินไปเท่าไหร่ ขาดเท่าไหร่ และใกล้เป้าแค่ไหน">
+      {error ? <Text className="rounded-xl bg-red-50 p-3 text-red-700">{error}</Text> : null}
+      {loading ? <ActivityIndicator color="#059669" /> : null}
+
+      {!loading && planData ? (
+        editingPlan || (!planData.plan && planData.currentWeightKg !== null) ? (
+          <PlanSetupCard
+            plan={planData.plan}
+            currentWeightKg={planData.currentWeightKg}
+            saving={savingPlan}
+            onSave={(input) => void submitPlan(input)}
+            onCancel={planData.plan ? () => setEditingPlan(false) : undefined}
+          />
+        ) : !planData.plan ? (
+          <EmptyState
+            title="เริ่มจากบันทึกน้ำหนักปัจจุบัน"
+            description="บันทึกน้ำหนักวันนี้ในช่องด้านล่างก่อน แล้วกลับมาตั้งเป้าหมายลดน้ำหนักได้เลย"
+          />
+        ) : !planData.summary ? (
+          <Card>
+            <Text className="font-bold text-slate-950">ข้อมูลยังไม่ครบสำหรับคำนวณ</Text>
+            <Text className="mt-2 text-sm leading-5 text-slate-600">
+              กรุณากรอกวันเกิด (อายุ 18 ปีขึ้นไป) ส่วนสูง และบันทึกน้ำหนักปัจจุบันให้ครบ
+              ระบบจึงจะคำนวณงบแคลอรีรายวันให้ได้
             </Text>
-          </Pressable>
-        ))}
-      </View>
+            <View className="mt-4">
+              <ActionButton label="ปรับแผน" variant="secondary" onPress={() => setEditingPlan(true)} />
+            </View>
+          </Card>
+        ) : (
+          <>
+            <TodayCard summary={planData.summary} />
+            <ZoneCard summary={planData.summary} />
+            <GoalCard summary={planData.summary} />
+            <ProjectionCard summary={planData.summary} />
+            <ActionButton label="ปรับแผนลดน้ำหนัก" variant="secondary" onPress={() => setEditingPlan(true)} />
+          </>
+        )
+      ) : null}
+
 
       <Card>
         <Text className="font-bold text-slate-950">บันทึกน้ำหนักวันนี้</Text>
@@ -177,98 +245,6 @@ export default function ProgressScreen() {
           </View>
         </View>
       </Card>
-
-      <SectionHeader title="AI วิเคราะห์ความคืบหน้ารูปร่าง" />
-      <Card>
-        <Text className="font-bold text-slate-950">
-          รูปปัจจุบัน + น้ำหนัก
-        </Text>
-        <Text className="mt-2 text-sm leading-5 text-slate-500">
-          ใช้รูปเต็มลำตัวที่สว่างและยืนตรง AI จะไม่วัดเปอร์เซ็นต์ไขมันหรือวินิจฉัยโรค และระบบจะไม่เก็บไฟล์รูปหลังวิเคราะห์
-        </Text>
-        <View className="mt-4 flex-row gap-2">
-          {(['male', 'female'] as const).map((value) => (
-            <Pressable
-              key={value}
-              onPress={() => setSex(value)}
-              className={`min-h-11 flex-1 items-center justify-center rounded-xl border ${sex === value ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300 bg-white'}`}
-            >
-              <Text className={sex === value ? 'font-bold text-emerald-800' : 'text-slate-700'}>
-                {value === 'male' ? 'ชาย' : 'หญิง'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        {photo ? (
-          <Image
-            source={{ uri: photo.uri }}
-            resizeMode="cover"
-            className="mt-4 h-72 w-full rounded-2xl bg-slate-100"
-          />
-        ) : null}
-        <View className="mt-4 gap-3">
-          <ActionButton
-            label={photo ? 'เปลี่ยนรูป' : 'เลือกรูปจากเครื่อง'}
-            disabled={analyzing}
-            onPress={() => void chooseProgressPhoto()}
-          />
-          {photo ? (
-            <ActionButton
-              label={analyzing ? 'AI กำลังวิเคราะห์...' : 'วิเคราะห์และบันทึกน้ำหนัก'}
-              disabled={analyzing}
-              onPress={() => void analyzePhoto()}
-            />
-          ) : null}
-        </View>
-        {analyzing ? (
-          <View className="mt-5 items-center">
-            <ActivityIndicator color="#059669" />
-            <Text className="mt-2 text-sm text-slate-500">
-              กำลังตรวจรูปและคำนวณเป้าหมายจากข้อมูลจริง...
-            </Text>
-          </View>
-        ) : null}
-      </Card>
-
-      {analysis ? (
-        <>
-          <SectionHeader title="ผลวิเคราะห์ล่าสุด" />
-          <Card>
-            <Text className="text-center text-4xl font-black text-emerald-700">
-              {analysis.nutrition.calories}
-            </Text>
-            <Text className="text-center text-slate-500">kcal ต่อวัน</Text>
-            <View className="mt-4 gap-3 rounded-2xl bg-slate-50 p-4">
-              <Text className="text-slate-700">โปรตีน {analysis.nutrition.protein_g} g</Text>
-              <Text className="text-slate-700">คาร์บ {analysis.nutrition.carbs_g} g</Text>
-              <Text className="text-slate-700">ไขมัน {analysis.nutrition.fat_g} g</Text>
-            </View>
-            <Text className="mt-4 text-sm text-slate-600">
-              BMR {analysis.nutrition.bmr} · TDEE {analysis.nutrition.tdee} kcal
-            </Text>
-            <Text className="mt-1 text-sm text-slate-600">
-              แนวโน้มตามเป้า {analysis.nutrition.weekly_weight_change_kg} กก./สัปดาห์
-            </Text>
-            <Text className="mt-5 font-bold text-slate-950">สิ่งที่สังเกตได้จากรูป</Text>
-            {analysis.visual.observations.map((item) => (
-              <Text key={item} className="mt-2 leading-5 text-slate-700">• {item}</Text>
-            ))}
-            <Text className="mt-5 font-bold text-slate-950">คำแนะนำ</Text>
-            {analysis.visual.recommendations.map((item) => (
-              <Text key={item} className="mt-2 leading-5 text-slate-700">• {item}</Text>
-            ))}
-            {analysis.visual.warnings.map((item) => (
-              <Text key={item} className="mt-2 text-sm text-amber-700">• {item}</Text>
-            ))}
-            <Text className="mt-4 text-xs leading-4 text-slate-400">
-              ผลจากรูปเป็นเพียงการสังเกตด้วย AI ตัวเลขโภชนาการคำนวณจากข้อมูลร่างกายและสูตรมาตรฐาน
-            </Text>
-          </Card>
-        </>
-      ) : null}
-
-      {error ? <Text className="rounded-xl bg-red-50 p-3 text-red-700">{error}</Text> : null}
-      {loading ? <ActivityIndicator color="#059669" /> : null}
 
       {!loading ? (
         <>
@@ -301,6 +277,20 @@ export default function ProgressScreen() {
           ) : (
             <EmptyState title="ยังไม่มีข้อมูลน้ำหนัก" description="เพิ่มน้ำหนักรายการแรกได้จากช่องด้านบน" />
           )}
+
+      <View className="flex-row gap-2">
+        {([7, 30, 90] as const).map((value) => (
+          <Pressable
+            key={value}
+            className={`min-h-11 flex-1 items-center justify-center rounded-xl ${days === value ? 'bg-emerald-600' : 'border border-slate-300 bg-white'}`}
+            onPress={() => setDays(value)}
+          >
+            <Text className={days === value ? 'text-white' : 'text-slate-700'}>
+              {value} วัน
+            </Text>
+          </Pressable>
+        ))}
+      </View>
 
           <SectionHeader title={`สรุปพลังงาน ${days} วัน`} />
           <Card>
@@ -391,6 +381,95 @@ export default function ProgressScreen() {
             )}
           </Card>
 
+        </>
+      ) : null}
+
+      <SectionHeader title="AI วิเคราะห์ความคืบหน้ารูปร่าง" />
+      <Card>
+        <Text className="font-bold text-slate-950">
+          รูปปัจจุบัน + น้ำหนัก
+        </Text>
+        <Text className="mt-2 text-sm leading-5 text-slate-500">
+          ใช้รูปเต็มลำตัวที่สว่างและยืนตรง AI จะไม่วัดเปอร์เซ็นต์ไขมันหรือวินิจฉัยโรค และระบบจะไม่เก็บไฟล์รูปหลังวิเคราะห์
+        </Text>
+        <View className="mt-4 flex-row gap-2">
+          {(['male', 'female'] as const).map((value) => (
+            <Pressable
+              key={value}
+              onPress={() => setSex(value)}
+              className={`min-h-11 flex-1 items-center justify-center rounded-xl border ${sex === value ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300 bg-white'}`}
+            >
+              <Text className={sex === value ? 'font-bold text-emerald-800' : 'text-slate-700'}>
+                {value === 'male' ? 'ชาย' : 'หญิง'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        {photo ? (
+          <Image
+            source={{ uri: photo.uri }}
+            resizeMode="cover"
+            className="mt-4 h-72 w-full rounded-2xl bg-slate-100"
+          />
+        ) : null}
+        <View className="mt-4 gap-3">
+          <ActionButton
+            label={photo ? 'เปลี่ยนรูป' : 'เลือกรูปจากเครื่อง'}
+            disabled={analyzing}
+            onPress={() => void chooseProgressPhoto()}
+          />
+          {photo ? (
+            <ActionButton
+              label={analyzing ? 'AI กำลังวิเคราะห์...' : 'วิเคราะห์และบันทึกน้ำหนัก'}
+              disabled={analyzing}
+              onPress={() => void analyzePhoto()}
+            />
+          ) : null}
+        </View>
+        {analyzing ? (
+          <View className="mt-5 items-center">
+            <ActivityIndicator color="#059669" />
+            <Text className="mt-2 text-sm text-slate-500">
+              กำลังตรวจรูปและคำนวณเป้าหมายจากข้อมูลจริง...
+            </Text>
+          </View>
+        ) : null}
+      </Card>
+
+      {analysis ? (
+        <>
+          <SectionHeader title="ผลวิเคราะห์ล่าสุด" />
+          <Card>
+            <Text className="text-center text-4xl font-black text-emerald-700">
+              {analysis.nutrition.calories}
+            </Text>
+            <Text className="text-center text-slate-500">kcal ต่อวัน</Text>
+            <View className="mt-4 gap-3 rounded-2xl bg-slate-50 p-4">
+              <Text className="text-slate-700">โปรตีน {analysis.nutrition.protein_g} g</Text>
+              <Text className="text-slate-700">คาร์บ {analysis.nutrition.carbs_g} g</Text>
+              <Text className="text-slate-700">ไขมัน {analysis.nutrition.fat_g} g</Text>
+            </View>
+            <Text className="mt-4 text-sm text-slate-600">
+              BMR {analysis.nutrition.bmr} · TDEE {analysis.nutrition.tdee} kcal
+            </Text>
+            <Text className="mt-1 text-sm text-slate-600">
+              แนวโน้มตามเป้า {analysis.nutrition.weekly_weight_change_kg} กก./สัปดาห์
+            </Text>
+            <Text className="mt-5 font-bold text-slate-950">สิ่งที่สังเกตได้จากรูป</Text>
+            {analysis.visual.observations.map((item) => (
+              <Text key={item} className="mt-2 leading-5 text-slate-700">• {item}</Text>
+            ))}
+            <Text className="mt-5 font-bold text-slate-950">คำแนะนำ</Text>
+            {analysis.visual.recommendations.map((item) => (
+              <Text key={item} className="mt-2 leading-5 text-slate-700">• {item}</Text>
+            ))}
+            {analysis.visual.warnings.map((item) => (
+              <Text key={item} className="mt-2 text-sm text-amber-700">• {item}</Text>
+            ))}
+            <Text className="mt-4 text-xs leading-4 text-slate-400">
+              ผลจากรูปเป็นเพียงการสังเกตด้วย AI ตัวเลขโภชนาการคำนวณจากข้อมูลร่างกายและสูตรมาตรฐาน
+            </Text>
+          </Card>
         </>
       ) : null}
     </Screen>
