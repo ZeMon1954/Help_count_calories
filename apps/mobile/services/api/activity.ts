@@ -57,6 +57,14 @@ export async function fetchActivities(token: string, limit = 20) {
     })
   ).data.items;
 }
+export async function fetchActivityRoute(token: string, id: string) {
+  return (
+    await apiRequest<{ route: { latitude: number; longitude: number }[] }>(
+      `activities/${id}/route`,
+      { headers: headers(token) },
+    )
+  ).data.route;
+}
 export async function appendActivityPoints(
   token: string,
   id: string,

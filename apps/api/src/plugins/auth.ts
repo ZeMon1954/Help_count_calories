@@ -15,6 +15,48 @@ interface AuthPluginOptions {
   verifyAccessToken?: VerifyAccessToken;
 }
 
+const TOKEN_CACHE_TTL_MS = 30_000;
+const TOKEN_CACHE_MAX_ENTRIES = 500;
+
+/**
+ * Wraps a token verifier with a short in-memory cache so one screen that fires
+ * several API calls does not make several round trips to Supabase Auth.
+ * Only successful verifications are cached, and a revoked token can stay
+ * valid for at most `ttlMs`.
+ */
+export function withTokenCache(
+  verify: VerifyAccessToken,
+  {
+    ttlMs = TOKEN_CACHE_TTL_MS,
+    maxEntries = TOKEN_CACHE_MAX_ENTRIES,
+    now = Date.now,
+  }: { ttlMs?: number; maxEntries?: number; now?: () => number } = {},
+): VerifyAccessToken {
+  const cache = new Map<string, { identity: AuthIdentity; expiresAt: number }>();
+  const pending = new Map<string, Promise<AuthIdentity | null>>();
+  return async (token) => {
+    const hit = cache.get(token);
+    if (hit && hit.expiresAt > now()) return hit.identity;
+    if (hit) cache.delete(token);
+    const inFlight = pending.get(token);
+    if (inFlight) return inFlight;
+    const request = verify(token)
+      .then((identity) => {
+        if (identity) {
+          if (cache.size >= maxEntries) {
+            const oldest = cache.keys().next().value;
+            if (oldest !== undefined) cache.delete(oldest);
+          }
+          cache.set(token, { identity, expiresAt: now() + ttlMs });
+        }
+        return identity;
+      })
+      .finally(() => pending.delete(token));
+    pending.set(token, request);
+    return request;
+  };
+}
+
 export const authPlugin = fp<AuthPluginOptions>(
   async (app, { env, verifyAccessToken }) => {
     let verifyToken = verifyAccessToken;
@@ -28,11 +70,11 @@ export const authPlugin = fp<AuthPluginOptions>(
         },
       });
 
-      verifyToken = async (token) => {
+      verifyToken = withTokenCache(async (token) => {
         const { data, error } = await supabase.auth.getUser(token);
         if (error || !data.user) return null;
         return { id: data.user.id, email: data.user.email ?? null };
-      };
+      });
     }
 
     app.decorate(

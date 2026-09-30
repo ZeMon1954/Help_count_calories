@@ -6,6 +6,9 @@ import { appendActivityPoints, type ActivityPoint } from './api/activity';
 export const ACTIVITY_LOCATION_TASK = 'fitness-foreground-location-web';
 const queueKey = (id: string) => `gps-queue:${id}`;
 const sequenceKey = (id: string) => `gps-sequence:${id}`;
+const BATCH_MIN_POINTS = 5;
+const BATCH_MAX_WAIT_MS = 20_000;
+const lastFlushAt = new Map<string, number>();
 
 function pointFromLocation(
   location: Location.LocationObject,
@@ -91,9 +94,22 @@ export async function captureForegroundLocation(
   const sequence =
     Number(await AsyncStorage.getItem(sequenceKey(activityId))) || 0;
   await AsyncStorage.setItem(sequenceKey(activityId), String(sequence + 1));
-  return flushQueuedActivityPoints(token, activityId, [
-    pointFromLocation(location, sequence),
-  ]);
+  const point = pointFromLocation(location, sequence);
+
+  // Upload in small batches instead of one request per GPS fix. Anything still
+  // queued is flushed when the activity is paused or finished.
+  const stored = await AsyncStorage.getItem(queueKey(activityId));
+  const queued = stored ? (JSON.parse(stored) as ActivityPoint[]) : [];
+  const waited = Date.now() - (lastFlushAt.get(activityId) ?? 0);
+  if (queued.length + 1 < BATCH_MIN_POINTS && waited < BATCH_MAX_WAIT_MS) {
+    await AsyncStorage.setItem(
+      queueKey(activityId),
+      JSON.stringify([...queued, point].slice(-10_000)),
+    );
+    return true;
+  }
+  lastFlushAt.set(activityId, Date.now());
+  return flushQueuedActivityPoints(token, activityId, [point]);
 }
 
 export async function beginBackgroundTracking(activityId: string) {
@@ -102,6 +118,7 @@ export async function beginBackgroundTracking(activityId: string) {
 export async function pauseBackgroundTracking() {}
 export async function clearBackgroundTracking() {}
 export async function clearActivityPointQueue(activityId: string) {
+  lastFlushAt.delete(activityId);
   await Promise.all([
     AsyncStorage.removeItem(queueKey(activityId)),
     AsyncStorage.removeItem(sequenceKey(activityId)),

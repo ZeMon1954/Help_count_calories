@@ -127,6 +127,23 @@ function addDays(date: string, days: number) {
     .slice(0, 10);
 }
 
+export function planTargetsFor(
+  input: Omit<WeightPlanInputs, 'daily' | 'weightHistory'>,
+) {
+  const summary = calculateWeightPlan({
+    ...input,
+    daily: [],
+    weightHistory: [],
+  });
+  return summary
+    ? {
+        dailyBurn: summary.dailyBurn,
+        targetDeficit: summary.targetDeficit,
+        zone: summary.zone,
+      }
+    : null;
+}
+
 export function calculateWeightPlan(
   input: WeightPlanInputs,
 ): WeightPlanSummary | null {

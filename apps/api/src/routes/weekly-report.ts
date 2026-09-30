@@ -6,7 +6,7 @@ import {
   shiftDate,
 } from '../services/weekly-report.js';
 import { WeeklyReportRepositoryError } from '../services/weekly-report-repository.js';
-import { calculateWeightPlan } from '../services/weight-plan-calculator.js';
+import { planTargetsFor } from '../services/weight-plan-calculator.js';
 import { WeightPlanRepositoryError } from '../services/weight-plan-repository.js';
 
 import type { RouteContext } from './types.js';
@@ -56,25 +56,15 @@ export function registerWeeklyReportRoutes(context: RouteContext) {
             endUtc,
           }),
         ]);
-        // Targets come from the plan; an empty `daily` is enough to read them.
-        const planSummary = plan
-          ? calculateWeightPlan({
+        const targets = plan
+          ? planTargetsFor({
               plan,
               birthDate: profile.profile?.birthDate ?? null,
               heightCm: profile.profile?.heightCm ?? null,
               activityLevel: profile.profile?.activityLevel ?? null,
               currentWeightKg: profile.latestMeasurement?.weightKg ?? null,
               today: date,
-              daily: [],
-              weightHistory: [],
             })
-          : null;
-        const targets = planSummary
-          ? {
-              dailyBurn: planSummary.dailyBurn,
-              targetDeficit: planSummary.targetDeficit,
-              zone: planSummary.zone,
-            }
           : null;
         return {
           hasPlan: targets !== null,

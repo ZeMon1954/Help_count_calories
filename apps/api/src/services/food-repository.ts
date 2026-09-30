@@ -302,7 +302,7 @@ export function createFoodRepository(
       };
     },
     async getFavoriteFoods({accessToken}) {
-      const rows=await request<Record<string,unknown>[]>('food_favorites?select=food:foods(id,name,serving_size_g,calories,protein_g,carbs_g,fat_g,source,created_by)&order=created_at.desc',accessToken);
+      const rows=await request<Record<string,unknown>[]>('food_favorites?select=food:foods(id,name,serving_size_g,calories,protein_g,carbs_g,fat_g,source,created_by)&order=created_at.desc&limit=200',accessToken);
       return rows.flatMap(row=>row.food&&typeof row.food==='object'?[mapFood(row.food as Record<string,unknown>)]:[]);
     },
     async getRecentFoods({accessToken}) {

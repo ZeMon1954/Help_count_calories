@@ -23,6 +23,7 @@ import { Card, EmptyState } from '@/components/ui/Kit';
 import { useAuth } from '@/providers/AuthProvider';
 import {
   fetchActivities,
+  fetchActivityRoute,
   fetchCurrentActivity,
   finishActivity,
   setActivityStatus,
@@ -125,6 +126,12 @@ export default function ActivityScreen() {
   const [foregroundOnly, setForegroundOnly] = useState(false);
   const [error, setError] = useState('');
   const [showHistory, setShowHistory] = useState(false);
+  // History cards load their (thinned) route on demand instead of rendering
+  // twenty maps at once.
+  const [historyRoutes, setHistoryRoutes] = useState<Record<string, LatLng[]>>(
+    {},
+  );
+  const [loadingRouteId, setLoadingRouteId] = useState<string | null>(null);
   const [panelVisible, setPanelVisible] = useState(true);
   const panelAnim = useRef(new Animated.Value(0)).current;
   const lastLocationTimestamp = useRef(0);
@@ -300,6 +307,19 @@ export default function ActivityScreen() {
       subscription?.remove();
     };
   }, [active, foregroundOnly, session?.access_token]);
+
+  async function showRoute(id: string) {
+    if (!session?.access_token || loadingRouteId) return;
+    setLoadingRouteId(id);
+    try {
+      const points = await fetchActivityRoute(session.access_token, id);
+      setHistoryRoutes((current) => ({ ...current, [id]: points }));
+    } catch {
+      setError('โหลดเส้นทางไม่สำเร็จ');
+    } finally {
+      setLoadingRouteId(null);
+    }
+  }
 
   async function begin() {
     if (!session?.access_token || busy) return;
@@ -680,15 +700,28 @@ export default function ActivityScreen() {
             {history.length ? (
               history.map((item) => (
                 <Card key={item.id}>
-                  {item.route && item.route.length > 1 ? (
+                  {historyRoutes[item.id] && historyRoutes[item.id]!.length > 1 ? (
                     <View className="mb-4 h-32 w-full overflow-hidden rounded-2xl bg-slate-100">
                       <ActivityMap
-                        location={item.route[0]!}
-                        route={item.route}
+                        location={historyRoutes[item.id]![0]!}
+                        route={historyRoutes[item.id]!}
                         following={false}
                       />
                     </View>
-                  ) : null}
+                  ) : (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={loadingRouteId === item.id}
+                      onPress={() => void showRoute(item.id)}
+                      className="mb-4 items-center rounded-2xl bg-slate-100 py-3"
+                    >
+                      <Text className="text-sm font-semibold text-slate-600">
+                        {loadingRouteId === item.id
+                          ? 'กำลังโหลดเส้นทาง...'
+                          : 'ดูเส้นทาง'}
+                      </Text>
+                    </Pressable>
+                  )}
                   <View className="flex-row items-center">
                     <View className="bg-primary-500/10 h-12 w-12 items-center justify-center rounded-2xl">
                       <ActivityIcon

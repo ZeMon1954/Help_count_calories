@@ -21,10 +21,10 @@ import {
   analyzePhysiquePhoto,
   type PhysiqueAnalysisResult,
 } from '@/services/api/physique-analysis';
-import { fetchProgress, saveWeight, type ProgressSnapshot } from '@/services/api/progress';
-import { fetchWeeklyReport, type WeeklyReport } from '@/services/api/weekly-report';
+import { saveWeight } from '@/services/api/progress';
+import { fetchStats } from '@/services/api/stats';
+import type { WeeklyReport } from '@/services/api/weekly-report';
 import {
-  fetchWeightPlan,
   saveWeightPlan,
   type WeightPlanInput,
   type WeightPlanSnapshot,
@@ -32,7 +32,6 @@ import {
 
 export default function ProgressScreen() {
   const { session } = useAuth();
-  const [data, setData] = useState<ProgressSnapshot | null>(null);
   const [weekly, setWeekly] = useState<WeeklyReport | null>(null);
   const [planData, setPlanData] = useState<WeightPlanSnapshot | null>(null);
   const [editingPlan, setEditingPlan] = useState(false);
@@ -51,14 +50,10 @@ export default function ProgressScreen() {
     setLoading(true);
     setError('');
     try {
-      const [progress, plan, report] = await Promise.all([
-        fetchProgress(session.access_token, 90),
-        // The plan is an add-on: if it is unavailable the rest of the page
-        // (weights, weekly table) should still load.
-        fetchWeightPlan(session.access_token).catch(() => null),
-        fetchWeeklyReport(session.access_token).catch(() => null),
-      ]);
-      setData(progress);
+      // One request covers the whole page: plan, weekly table and weights.
+      const { weekly: report, ...plan } = await fetchStats(
+        session.access_token,
+      );
       setPlanData(plan);
       setWeekly(report);
     } catch {
@@ -184,7 +179,7 @@ export default function ProgressScreen() {
     }
   }
 
-  const weights = data?.weightHistory ?? [];
+  const weights = planData?.weightHistory ?? [];
   return (
     <Screen title="สถิติ" subtitle="วันนี้กินไปเท่าไหร่ ขาดเท่าไหร่ และใกล้เป้าแค่ไหน">
       {error ? <Text className="rounded-xl bg-red-50 p-3 text-red-700">{error}</Text> : null}

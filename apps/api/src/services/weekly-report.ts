@@ -14,6 +14,7 @@ export interface RawActivity {
 }
 
 export interface RawMeasurement {
+  id?: string;
   weightKg: number;
   recordedAt: string;
 }

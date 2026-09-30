@@ -37,6 +37,24 @@ export function registerActivityRoutes(context: RouteContext) {
     },
   );
   app.get(
+    '/api/activities/:activityId/route',
+    { preHandler: app.verifySupabaseJwt },
+    async (request, reply) => {
+      const params = activityParamsSchema.safeParse(request.params);
+      if (!params.success) return reply.badRequest('Invalid activity ID');
+      try {
+        const route = await activityRepository.route({
+          userId: request.authUser!.id,
+          token: request.authToken!,
+          activityId: params.data.activityId,
+        });
+        return route ? { route } : reply.notFound('Activity not found');
+      } catch {
+        return reply.badGateway('Unable to load activity route');
+      }
+    },
+  );
+  app.get(
     '/api/activities/current',
     { preHandler: app.verifySupabaseJwt },
     async (request, reply) => {

@@ -29,6 +29,7 @@ function repository(): ActivityRepository {
     create: async () => record,
     current: async () => null,
     list: async () => [],
+    route: async () => [{ latitude: 13.7, longitude: 100.5 }],
     totals: async () => ({ calories: 0, distanceM: 0, movingSeconds: 0 }),
     appendPoints: async ({ points }) => points.length,
     setStatus: async ({ status }) => ({ ...record, status }),
@@ -274,4 +275,103 @@ test('finishing keeps active elapsed time when GPS points are unusable', async (
   assert.ok(finished.elapsedSeconds >= 89);
   assert.equal(finished.distanceM, 0);
   assert.ok(Number(savedBody?.elapsed_seconds) >= 89);
+});
+
+test('history list omits routes and a route is loaded on demand', async () => {
+  const urls: string[] = [];
+  const fakeFetch: typeof fetch = async (input) => {
+    const url = String(input);
+    urls.push(url);
+    return new Response(JSON.stringify(url.includes('/activities?') ? [] : []), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  const repo = createActivityRepository(
+    loadEnv({
+      NODE_ENV: 'test',
+      SUPABASE_URL: 'https://example.supabase.co',
+      SUPABASE_ANON_KEY: 'anon',
+    }),
+    fakeFetch,
+  );
+  await repo.list({ userId: 'u', token: 't', limit: 20 });
+  assert.match(urls[0]!, /^https:\/\/example\.supabase\.co\/rest\/v1\/activities\?/);
+  assert.doesNotMatch(urls[0]!, /activity_points/);
+  assert.match(urls[0]!, /limit=20/);
+});
+
+test('route and finish page through every GPS point instead of stopping at 1000', async () => {
+  const totalPoints = 2_500;
+  const pointUrls: string[] = [];
+  const fakeFetch: typeof fetch = async (input) => {
+    const url = new URL(String(input));
+    let body: unknown[] = [];
+    if (url.pathname.endsWith('/activities')) {
+      body = [{ id: 'a', activity_type: 'walk', status: 'in_progress', started_at: '2026-09-21T00:00:00.000Z', updated_at: '2026-09-21T00:00:00.000Z', elapsed_seconds: 0 }];
+    } else if (url.pathname.endsWith('/activity_points')) {
+      pointUrls.push(url.search);
+      const limit = Number(url.searchParams.get('limit'));
+      const offset = Number(url.searchParams.get('offset'));
+      body = Array.from(
+        { length: Math.max(0, Math.min(limit, totalPoints - offset)) },
+        (_, index) => ({
+          sequence: offset + index,
+          latitude: 13 + (offset + index) * 0.00001,
+          longitude: 100,
+          recorded_at: new Date(Date.UTC(2026, 8, 21, 0, 0, offset + index)).toISOString(),
+        }),
+      );
+    }
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  const repo = createActivityRepository(
+    loadEnv({
+      NODE_ENV: 'test',
+      SUPABASE_URL: 'https://example.supabase.co',
+      SUPABASE_ANON_KEY: 'anon',
+    }),
+    fakeFetch,
+  );
+  const route = await repo.route({ userId: 'u', token: 't', activityId: 'a' });
+  assert.equal(pointUrls.length, 3);
+  assert.equal(route!.length, 300);
+  assert.equal(route![0]!.latitude, 13);
+  assert.ok(Math.abs(route![299]!.latitude - (13 + 2_499 * 0.00001)) < 1e-9);
+});
+
+test('downsampleRoute keeps both ends and never exceeds the cap', async () => {
+  const { downsampleRoute } = await import('../src/services/activity-repository.js');
+  const points = Array.from({ length: 1_000 }, (_, index) => index);
+  const thinned = downsampleRoute(points, 100);
+  assert.equal(thinned.length, 100);
+  assert.equal(thinned[0], 0);
+  assert.equal(thinned[99], 999);
+  assert.deepEqual(downsampleRoute([1, 2, 3], 100), [1, 2, 3]);
+});
+
+test('route endpoint validates the id and returns 404 for unknown activities', async () => {
+  const headers = { authorization: 'Bearer token' };
+  const app = await buildApp(loadEnv({ NODE_ENV: 'test' }), dependencies());
+  assert.equal(
+    (await app.inject({ method: 'GET', url: '/api/activities/x/route', headers })).statusCode,
+    400,
+  );
+  assert.equal(
+    (await app.inject({ method: 'GET', url: `/api/activities/${record.id}/route`, headers })).statusCode,
+    200,
+  );
+  const missing = await buildApp(
+    loadEnv({ NODE_ENV: 'test' }),
+    dependencies({ ...repository(), route: async () => null }),
+  );
+  assert.equal(
+    (await missing.inject({ method: 'GET', url: `/api/activities/${record.id}/route`, headers })).statusCode,
+    404,
+  );
+  await app.close();
+  await missing.close();
 });

@@ -34,6 +34,11 @@ export interface ActivityRepository {
     token: string;
     limit: number;
   }): Promise<ActivityRecord[]>;
+  route(input: {
+    userId: string;
+    token: string;
+    activityId: string;
+  }): Promise<{ latitude: number; longitude: number }[] | null>;
   totals(input: {
     userId: string;
     token: string;
@@ -100,6 +105,21 @@ function mapActivity(row: Record<string, unknown>): ActivityRecord {
   };
 }
 
+// PostgREST silently caps a response at its max-rows setting (1000 by
+// default), so anything that needs every GPS point must page explicitly.
+const POINT_PAGE_SIZE = 1_000;
+const MAX_POINT_PAGES = 50;
+export const ROUTE_PREVIEW_POINTS = 300;
+
+/** Evenly thin a route to at most `max` points, always keeping both ends. */
+export function downsampleRoute<T>(points: T[], max: number): T[] {
+  if (points.length <= max || max < 2) return points;
+  const step = (points.length - 1) / (max - 1);
+  return Array.from({ length: max }, (_, index) =>
+    points[Math.round(index * step)]!,
+  );
+}
+
 export function createActivityRepository(
   env: Env,
   fetchImpl: typeof fetch = fetch,
@@ -112,6 +132,7 @@ export function createActivityRepository(
       create: unavailable,
       current: unavailable,
       list: unavailable,
+      route: unavailable,
       totals: unavailable,
       appendPoints: unavailable,
       setStatus: unavailable,
@@ -156,8 +177,27 @@ export function createActivityRepository(
     if (!responseText) return undefined as T;
     return JSON.parse(responseText) as T;
   };
-  const select =
-    'id,activity_type,status,started_at,updated_at,ended_at,elapsed_seconds,moving_seconds,distance_m,elevation_gain_m,average_speed_mps,average_pace_seconds_per_km,calories,route:activity_points(sequence,latitude,longitude)';
+  const summaryColumns =
+    'id,activity_type,status,started_at,updated_at,ended_at,elapsed_seconds,moving_seconds,distance_m,elevation_gain_m,average_speed_mps,average_pace_seconds_per_km,calories';
+  // Only the in-progress activity needs its full route; history lists stay
+  // light and load a thinned route on demand.
+  const select = `${summaryColumns},route:activity_points(sequence,latitude,longitude)`;
+  const fetchAllPoints = async (
+    columns: string,
+    activityId: string,
+    token: string,
+  ) => {
+    const rows: Record<string, unknown>[] = [];
+    for (let page = 0; page < MAX_POINT_PAGES; page += 1) {
+      const chunk = await request<Record<string, unknown>[]>(
+        `activity_points?select=${columns}&activity_id=eq.${encodeURIComponent(activityId)}&order=sequence.asc&limit=${POINT_PAGE_SIZE}&offset=${page * POINT_PAGE_SIZE}`,
+        token,
+      );
+      rows.push(...chunk);
+      if (chunk.length < POINT_PAGE_SIZE) break;
+    }
+    return rows;
+  };
   return {
     async create({ userId, token, type }) {
       const active = await this.current({ userId, token });
@@ -186,10 +226,25 @@ export function createActivityRepository(
     },
     async list({ userId, token, limit }) {
       const rows = await request<Record<string, unknown>[]>(
-        `activities?select=${select}&user_id=eq.${encodeURIComponent(userId)}&status=eq.completed&order=started_at.desc&limit=${limit}`,
+        `activities?select=${summaryColumns}&user_id=eq.${encodeURIComponent(userId)}&status=eq.completed&order=started_at.desc&limit=${limit}`,
         token,
       );
       return rows.map(mapActivity);
+    },
+    async route({ userId, token, activityId }) {
+      const owner = await request<Record<string, unknown>[]>(
+        `activities?select=id&id=eq.${encodeURIComponent(activityId)}&user_id=eq.${encodeURIComponent(userId)}&limit=1`,
+        token,
+      );
+      if (!owner[0]) return null;
+      const rows = await fetchAllPoints('latitude,longitude', activityId, token);
+      return downsampleRoute(
+        rows.map((point) => ({
+          latitude: numeric(point.latitude),
+          longitude: numeric(point.longitude),
+        })),
+        ROUTE_PREVIEW_POINTS,
+      );
     },
     async totals({ userId, token, startUtc, endUtc }) {
       const rows = await request<Record<string, unknown>[]>(
@@ -274,8 +329,9 @@ export function createActivityRepository(
       );
       if (!activities[0]) return null;
       const finishedAt = new Date();
-      const points = await request<Record<string, unknown>[]>(
-        `activity_points?select=sequence,recorded_at,latitude,longitude,accuracy_m,altitude_m,speed_mps&activity_id=eq.${encodeURIComponent(activityId)}&order=sequence.asc`,
+      const points = await fetchAllPoints(
+        'sequence,recorded_at,latitude,longitude,accuracy_m,altitude_m,speed_mps',
+        activityId,
         token,
       );
       const weights = await request<Record<string, unknown>[]>(

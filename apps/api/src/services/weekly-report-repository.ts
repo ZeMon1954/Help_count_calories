@@ -76,7 +76,7 @@ export function createWeeklyReportRepository(
           accessToken,
         ),
         request(
-          `body_measurements?select=weight_kg,recorded_at&user_id=eq.${user}&recorded_at=gte.${start}&recorded_at=lt.${end}&order=recorded_at.asc&limit=2000`,
+          `body_measurements?select=id,weight_kg,recorded_at&user_id=eq.${user}&recorded_at=gte.${start}&recorded_at=lt.${end}&order=recorded_at.asc&limit=2000`,
           accessToken,
         ),
       ]);
@@ -96,6 +96,7 @@ export function createWeeklyReportRepository(
           calories: numeric(row.calories),
         })),
         measurements: measurements.map((row) => ({
+          id: String(row.id),
           weightKg: numeric(row.weight_kg),
           recordedAt: String(row.recorded_at),
         })),

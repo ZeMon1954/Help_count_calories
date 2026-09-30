@@ -1,3 +1,4 @@
+import compress from '@fastify/compress';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import sensible from '@fastify/sensible';
@@ -96,6 +97,7 @@ import { registerProgressRoutes } from './routes/progress.js';
 import { registerSettingsRoutes } from './routes/settings.js';
 import { registerWeightPlanRoutes } from './routes/weight-plan.js';
 import { registerWeeklyReportRoutes } from './routes/weekly-report.js';
+import { registerStatsRoutes } from './routes/stats.js';
 import {
   createWeeklyReportRepository,
   type WeeklyReportRepository,
@@ -168,6 +170,7 @@ export async function buildApp(
     };
   const analysisRequests = new Map<string, number[]>();
 
+  await app.register(compress, { threshold: 1024, global: true });
   await app.register(sensible);
   await app.register(multipart, {
     limits: { files: 1, fields: 0, parts: 1, fileSize: FOOD_IMAGE_MAX_BYTES },
@@ -218,6 +221,7 @@ export async function buildApp(
   registerProgressRoutes(routeContext);
   registerWeightPlanRoutes(routeContext);
   registerWeeklyReportRoutes(routeContext);
+  registerStatsRoutes(routeContext);
   registerFoodDiaryRoutes(routeContext);
   registerFoodAnalysisRoutes(routeContext);
 
