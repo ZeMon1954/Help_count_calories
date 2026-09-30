@@ -95,6 +95,11 @@ import { registerProfileRoutes } from './routes/profile.js';
 import { registerProgressRoutes } from './routes/progress.js';
 import { registerSettingsRoutes } from './routes/settings.js';
 import { registerWeightPlanRoutes } from './routes/weight-plan.js';
+import { registerWeeklyReportRoutes } from './routes/weekly-report.js';
+import {
+  createWeeklyReportRepository,
+  type WeeklyReportRepository,
+} from './services/weekly-report-repository.js';
 import {
   createWeightPlanRepository,
   type WeightPlanRepository,
@@ -109,6 +114,7 @@ interface AppDependencies {
   foodAnalysisService?: FoodAnalysisService;
   progressRepository?: ProgressRepository;
   weightPlanRepository?: WeightPlanRepository;
+  weeklyReportRepository?: WeeklyReportRepository;
   settingsRepository?: SettingsRepository;
   activityRepository?: ActivityRepository;
   nutritionAnalysisService?: NutritionAnalysisService;
@@ -136,6 +142,8 @@ export async function buildApp(
     dependencies.progressRepository ?? createProgressRepository(env);
   const weightPlanRepository =
     dependencies.weightPlanRepository ?? createWeightPlanRepository(env);
+  const weeklyReportRepository =
+    dependencies.weeklyReportRepository ?? createWeeklyReportRepository(env);
   const settingsRepository =
     dependencies.settingsRepository ?? createSettingsRepository(env);
   const activityRepository =
@@ -192,6 +200,7 @@ export async function buildApp(
     foodAnalysisService,
     progressRepository,
     weightPlanRepository,
+    weeklyReportRepository,
     settingsRepository,
     activityRepository,
     nutritionAnalysisService,
@@ -208,6 +217,7 @@ export async function buildApp(
   registerSettingsRoutes(routeContext);
   registerProgressRoutes(routeContext);
   registerWeightPlanRoutes(routeContext);
+  registerWeeklyReportRoutes(routeContext);
   registerFoodDiaryRoutes(routeContext);
   registerFoodAnalysisRoutes(routeContext);
 

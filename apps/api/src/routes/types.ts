@@ -12,6 +12,7 @@ import type { NutritionAnalysisService } from '../services/nutrition-analysis-se
 import type { PhysiqueAnalysisService } from '../services/physique-analysis-service.js';
 import type { RecordAiUsage } from '../services/ai-usage-repository.js';
 import type { WeightPlanRepository } from '../services/weight-plan-repository.js';
+import type { WeeklyReportRepository } from '../services/weekly-report-repository.js';
 
 export interface RouteContext {
   app: FastifyInstance;
@@ -22,6 +23,7 @@ export interface RouteContext {
   foodAnalysisService: FoodAnalysisService;
   progressRepository: ProgressRepository;
   weightPlanRepository: WeightPlanRepository;
+  weeklyReportRepository: WeeklyReportRepository;
   settingsRepository: SettingsRepository;
   activityRepository: ActivityRepository;
   nutritionAnalysisService: NutritionAnalysisService;

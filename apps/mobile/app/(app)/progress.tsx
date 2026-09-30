@@ -2,9 +2,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, Pressable, Text, TextInput, View } from 'react-native';
-import { LineChart, ProgressChart } from 'react-native-chart-kit';
+import { LineChart } from 'react-native-chart-kit';
 
 import { PlanSetupCard } from '@/components/stats/PlanSetupCard';
+import { WeeklyTable } from '@/components/stats/WeeklyTable';
 import {
   GoalCard,
   ProjectionCard,
@@ -21,6 +22,7 @@ import {
   type PhysiqueAnalysisResult,
 } from '@/services/api/physique-analysis';
 import { fetchProgress, saveWeight, type ProgressSnapshot } from '@/services/api/progress';
+import { fetchWeeklyReport, type WeeklyReport } from '@/services/api/weekly-report';
 import {
   fetchWeightPlan,
   saveWeightPlan,
@@ -30,8 +32,8 @@ import {
 
 export default function ProgressScreen() {
   const { session } = useAuth();
-  const [days, setDays] = useState<7 | 30 | 90>(7);
   const [data, setData] = useState<ProgressSnapshot | null>(null);
+  const [weekly, setWeekly] = useState<WeeklyReport | null>(null);
   const [planData, setPlanData] = useState<WeightPlanSnapshot | null>(null);
   const [editingPlan, setEditingPlan] = useState(false);
   const [savingPlan, setSavingPlan] = useState(false);
@@ -49,20 +51,22 @@ export default function ProgressScreen() {
     setLoading(true);
     setError('');
     try {
-      const [progress, plan] = await Promise.all([
-        fetchProgress(session.access_token, days),
+      const [progress, plan, report] = await Promise.all([
+        fetchProgress(session.access_token, 90),
         // The plan is an add-on: if it is unavailable the rest of the page
-        // (weights, energy summary) should still load.
+        // (weights, weekly table) should still load.
         fetchWeightPlan(session.access_token).catch(() => null),
+        fetchWeeklyReport(session.access_token).catch(() => null),
       ]);
       setData(progress);
       setPlanData(plan);
+      setWeekly(report);
     } catch {
       setError('โหลดข้อมูลความคืบหน้าไม่สำเร็จ');
     } finally {
       setLoading(false);
     }
-  }, [days, session?.access_token]);
+  }, [session?.access_token]);
 
   useFocusEffect(useCallback(() => void load(), [load]));
 
@@ -181,8 +185,6 @@ export default function ProgressScreen() {
   }
 
   const weights = data?.weightHistory ?? [];
-  const balance = data?.calorieBalance;
-  const balanceDifference = balance?.difference ?? null;
   return (
     <Screen title="สถิติ" subtitle="วันนี้กินไปเท่าไหร่ ขาดเท่าไหร่ และใกล้เป้าแค่ไหน">
       {error ? <Text className="rounded-xl bg-red-50 p-3 text-red-700">{error}</Text> : null}
@@ -216,14 +218,23 @@ export default function ProgressScreen() {
         ) : (
           <>
             <TodayCard summary={planData.summary} />
-            <ZoneCard summary={planData.summary} />
+            {weekly ? (
+              <WeeklyTable weeks={weekly.weeks} hasPlan={weekly.hasPlan} />
+            ) : null}
             <GoalCard summary={planData.summary} />
+            <ZoneCard summary={planData.summary} />
             <ProjectionCard summary={planData.summary} />
             <ActionButton label="ปรับแผนลดน้ำหนัก" variant="secondary" onPress={() => setEditingPlan(true)} />
           </>
         )
       ) : null}
 
+
+      {!loading &&
+      weekly &&
+      !(planData?.plan && planData.summary && !editingPlan) ? (
+        <WeeklyTable weeks={weekly.weeks} hasPlan={weekly.hasPlan} />
+      ) : null}
 
       <Card>
         <Text className="font-bold text-slate-950">บันทึกน้ำหนักวันนี้</Text>
@@ -277,109 +288,6 @@ export default function ProgressScreen() {
           ) : (
             <EmptyState title="ยังไม่มีข้อมูลน้ำหนัก" description="เพิ่มน้ำหนักรายการแรกได้จากช่องด้านบน" />
           )}
-
-      <View className="flex-row gap-2">
-        {([7, 30, 90] as const).map((value) => (
-          <Pressable
-            key={value}
-            className={`min-h-11 flex-1 items-center justify-center rounded-xl ${days === value ? 'bg-emerald-600' : 'border border-slate-300 bg-white'}`}
-            onPress={() => setDays(value)}
-          >
-            <Text className={days === value ? 'text-white' : 'text-slate-700'}>
-              {value} วัน
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-          <SectionHeader title={`สรุปพลังงาน ${days} วัน`} />
-          <Card>
-            {balanceDifference === null ? (
-              <Text className="text-slate-500">
-                ตั้งเป้าแคลอรีและบันทึกอาหารเพื่อดูยอดขาดหรือเกินสะสม
-              </Text>
-            ) : (
-              <View className="gap-4">
-                <View className={`rounded-2xl p-4 ${balanceDifference > 0 ? 'bg-amber-50' : 'bg-emerald-50'}`}>
-                  <Text className={`text-sm font-semibold ${balanceDifference > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                    {balanceDifference > 0 ? 'กินเกินเป้าสะสม' : balanceDifference < 0 ? 'กินต่ำกว่าเป้าสะสม' : 'กินตรงเป้าพอดี'}
-                  </Text>
-                  <Text className={`mt-1 text-3xl font-black ${balanceDifference > 0 ? 'text-amber-900' : 'text-emerald-900'}`}>
-                    {Math.abs(Math.round(balanceDifference)).toLocaleString('th-TH')} kcal
-                  </Text>
-                </View>
-
-                <View className="gap-2">
-                  <View className="flex-row justify-between gap-3">
-                    <Text className="text-slate-500">กินทั้งหมด</Text>
-                    <Text className="font-bold text-slate-900">{Math.round(balance?.totalConsumed ?? 0).toLocaleString('th-TH')} kcal</Text>
-                  </View>
-                  <View className="flex-row justify-between gap-3">
-                    <Text className="text-slate-500">เป้ารวม ({balance?.daysTracked ?? 0} วันที่บันทึก)</Text>
-                    <Text className="font-bold text-slate-900">{Math.round(balance?.totalTarget ?? 0).toLocaleString('th-TH')} kcal</Text>
-                  </View>
-                  <View className="flex-row justify-between gap-3">
-                    <Text className="text-slate-500">ออกกำลังกาย</Text>
-                    <Text className="font-bold text-sky-700">{Math.round(balance?.exerciseCalories ?? 0).toLocaleString('th-TH')} kcal</Text>
-                  </View>
-                </View>
-
-                {(balance?.daily.length ?? 0) > 0 ? (
-                  <View className="border-t border-slate-100 pt-3">
-                    <Text className="mb-2 font-bold text-slate-900">รายวันล่าสุด</Text>
-                    {balance?.daily.slice(-7).map((day) => (
-                      <View key={day.date} className="flex-row items-center justify-between gap-3 border-b border-slate-100 py-2 last:border-b-0">
-                        <Text className="text-sm text-slate-500">
-                          {new Date(`${day.date}T12:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
-                        </Text>
-                        <Text className={`text-sm font-bold ${day.difference === null ? 'text-slate-400' : day.difference > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                          {day.difference === null
-                            ? `ออก ${Math.round(day.exerciseCalories)} kcal`
-                            : `${day.difference > 0 ? 'เกิน' : day.difference < 0 ? 'ขาด' : 'ตรงเป้า'} ${Math.abs(Math.round(day.difference)).toLocaleString('th-TH')} kcal`}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-
-                <Text className="text-xs leading-5 text-slate-400">
-                  นับเฉพาะวันที่มีบันทึกอาหาร วันที่ไม่มีข้อมูลจะไม่ถูกตีความว่ากิน 0 แคลอรี และแสดงพลังงานออกกำลังกายแยกเพื่อไม่ให้นับกิจกรรมซ้ำกับค่าเป้ารายวัน
-                </Text>
-              </View>
-            )}
-          </Card>
-
-          <SectionHeader title="ความสม่ำเสมอของแคลอรี" />
-          <Card>
-            {data?.calorieAdherence.percentage === null ? (
-              <Text className="text-slate-500">ยังไม่มีเป้าหมายแคลอรีหรือข้อมูลอาหารเพียงพอ</Text>
-            ) : (
-              <View className="flex-row items-center gap-4">
-                <ProgressChart
-                  data={[ (data?.calorieAdherence.percentage ?? 0) / 100 ]}
-                  width={100}
-                  height={100}
-                  strokeWidth={12}
-                  radius={40}
-                  chartConfig={{
-                    backgroundGradientFrom: '#ffffff',
-                    backgroundGradientTo: '#ffffff',
-                    color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
-                  }}
-                  hideLegend={true}
-                />
-                <View className="flex-1">
-                  <Text className="text-3xl font-bold text-slate-950">
-                    {data?.calorieAdherence.percentage}%
-                  </Text>
-                  <Text className="mt-1 text-sm text-slate-500">
-                    อยู่ในช่วง ±10% ของเป้าหมาย {data?.calorieAdherence.daysWithinTarget}/
-                    {data?.calorieAdherence.daysLogged} วันที่บันทึก
-                  </Text>
-                </View>
-              </View>
-            )}
-          </Card>
 
         </>
       ) : null}
