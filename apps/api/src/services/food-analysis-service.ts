@@ -18,9 +18,27 @@ export class FoodAnalysisError extends Error {
   constructor(
     readonly code: FoodAnalysisErrorCode,
     readonly upstreamStatus?: number,
+    readonly upstreamDiagnostic?: string,
   ) {
     super(code);
     this.name = 'FoodAnalysisError';
+  }
+}
+
+async function readGeminiError(response: Response) {
+  try {
+    const body = (await response.json()) as {
+      error?: { message?: unknown; status?: unknown };
+    };
+    const message =
+      typeof body.error?.message === 'string' ? body.error.message : undefined;
+    const status =
+      typeof body.error?.status === 'string' ? body.error.status : undefined;
+    return (
+      [status, message].filter(Boolean).join(': ').slice(0, 500) || undefined
+    );
+  } catch {
+    return undefined;
   }
 }
 
@@ -128,26 +146,36 @@ export function createFoodAnalysisService(
 
       const startedAt = performance.now();
       let requestCount = 0;
+      let requestedModel = env.GEMINI_MODEL;
       let upstreamStatus: number | undefined;
       let usage: GeminiResponse['usageMetadata'];
       let usageRecorded = false;
       const recordUsage = async (
-        outcome: 'success' | 'quota_exceeded' | 'provider_error' | 'timeout' | 'invalid_response',
+        outcome:
+          | 'success'
+          | 'quota_exceeded'
+          | 'provider_error'
+          | 'timeout'
+          | 'invalid_response',
       ) => {
         if (!input.recordUsage || usageRecorded) return;
         usageRecorded = true;
-        await input.recordUsage({
-          feature: 'food_analysis',
-          model: env.GEMINI_MODEL,
-          requestCount: Math.max(1, requestCount),
-          outcome,
-          upstreamStatus,
-          promptTokens: usage?.promptTokenCount,
-          outputTokens: usage?.candidatesTokenCount,
-          thinkingTokens: usage?.thoughtsTokenCount,
-          totalTokens: usage?.totalTokenCount,
-          latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
-        });
+        try {
+          await input.recordUsage({
+            feature: 'food_analysis',
+            model: requestedModel,
+            requestCount: Math.max(1, requestCount),
+            outcome,
+            upstreamStatus,
+            promptTokens: usage?.promptTokenCount,
+            outputTokens: usage?.candidatesTokenCount,
+            thinkingTokens: usage?.thoughtsTokenCount,
+            totalTokens: usage?.totalTokenCount,
+            latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+          });
+        } catch {
+          // Usage telemetry must never turn a successful analysis into a failure.
+        }
       };
       const controller = new AbortController();
       const timeout = setTimeout(
@@ -155,8 +183,6 @@ export function createFoodAnalysisService(
         env.AI_REQUEST_TIMEOUT_MS,
       );
       try {
-        const model = encodeURIComponent(env.GEMINI_MODEL);
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
         const requestInit: RequestInit = {
           method: 'POST',
           headers: {
@@ -189,6 +215,10 @@ export function createFoodAnalysisService(
         };
         let response: Response | undefined;
         for (let attempt = 0; attempt < 2; attempt += 1) {
+          requestedModel =
+            attempt === 0 ? env.GEMINI_MODEL : env.GEMINI_FALLBACK_MODEL;
+          const model = encodeURIComponent(requestedModel);
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
           requestCount += 1;
           response = await fetchImpl(url, requestInit);
           upstreamStatus = response.status;
@@ -197,11 +227,29 @@ export function createFoodAnalysisService(
         }
         if (!response) throw new FoodAnalysisError('provider_error');
         if (!response.ok) {
+          const diagnostic = await readGeminiError(response);
           if (response.status === 429)
-            throw new FoodAnalysisError('quota_exceeded', response.status);
-          if (response.status === 401 || response.status === 403)
-            throw new FoodAnalysisError('not_configured', response.status);
-          throw new FoodAnalysisError('provider_error', response.status);
+            throw new FoodAnalysisError(
+              'quota_exceeded',
+              response.status,
+              diagnostic,
+            );
+          if (
+            response.status === 400 ||
+            response.status === 401 ||
+            response.status === 403 ||
+            response.status === 404
+          )
+            throw new FoodAnalysisError(
+              'not_configured',
+              response.status,
+              diagnostic,
+            );
+          throw new FoodAnalysisError(
+            'provider_error',
+            response.status,
+            diagnostic,
+          );
         }
 
         const envelope = (await response.json()) as GeminiResponse;
@@ -226,10 +274,12 @@ export function createFoodAnalysisService(
         const outcome =
           error instanceof FoodAnalysisError && error.code === 'quota_exceeded'
             ? 'quota_exceeded'
-            : (error instanceof FoodAnalysisError && error.code === 'timeout') ||
+            : (error instanceof FoodAnalysisError &&
+                  error.code === 'timeout') ||
                 (error instanceof Error && error.name === 'AbortError')
               ? 'timeout'
-              : error instanceof FoodAnalysisError && error.code === 'invalid_ai_response'
+              : error instanceof FoodAnalysisError &&
+                  error.code === 'invalid_ai_response'
                 ? 'invalid_response'
                 : 'provider_error';
         await recordUsage(outcome);

@@ -341,11 +341,13 @@ test('Gemini service maps a non-food response with an empty name correctly', asy
 
 test('Gemini service retries a temporary provider failure', async () => {
   let calls = 0;
+  const requestedUrls: string[] = [];
   const delays: number[] = [];
   const service = createFoodAnalysisService(
     loadEnv({ NODE_ENV: 'test', GEMINI_API_KEY: 'test-key' }),
-    async () => {
+    async (input) => {
       calls += 1;
+      requestedUrls.push(input.toString());
       if (calls === 1) return new Response(null, { status: 503 });
       return new Response(
         JSON.stringify({
@@ -393,6 +395,8 @@ test('Gemini service retries a temporary provider failure', async () => {
   assert.equal(result.food_name, 'กล้วย');
   assert.equal(calls, 2);
   assert.deepEqual(delays, [250]);
+  assert.match(requestedUrls[0]!, /gemini-3\.5-flash-lite/);
+  assert.match(requestedUrls[1]!, /gemini-3\.1-flash-lite/);
 });
 
 test('Gemini service does not retry a quota response', async () => {
@@ -415,4 +419,85 @@ test('Gemini service does not retry a quota response', async () => {
       error instanceof FoodAnalysisError && error.code === 'quota_exceeded',
   );
   assert.equal(calls, 1);
+});
+
+test('Gemini service preserves safe provider diagnostics for configuration errors', async () => {
+  const service = createFoodAnalysisService(
+    loadEnv({ NODE_ENV: 'test', GEMINI_API_KEY: 'test-key' }),
+    async () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            code: 404,
+            status: 'NOT_FOUND',
+            message: 'The requested model was not found',
+          },
+        }),
+        { status: 404, headers: { 'content-type': 'application/json' } },
+      ),
+  );
+
+  await assert.rejects(
+    service.analyze({
+      bytes: jpegBytes,
+      mimeType: 'image/jpeg',
+      userId: 'verified-user',
+    }),
+    (error: unknown) =>
+      error instanceof FoodAnalysisError &&
+      error.code === 'not_configured' &&
+      error.upstreamStatus === 404 &&
+      error.upstreamDiagnostic ===
+        'NOT_FOUND: The requested model was not found',
+  );
+});
+
+test('Gemini analysis succeeds when usage telemetry is unavailable', async () => {
+  const service = createFoodAnalysisService(
+    loadEnv({ NODE_ENV: 'test', GEMINI_API_KEY: 'test-key' }),
+    async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      is_food: true,
+                      food_name: 'Chicken burger',
+                      items: [
+                        {
+                          name: 'Chicken burger',
+                          estimated_quantity_g: 150,
+                          calories: 300,
+                          protein_g: 15,
+                          carbs_g: 38,
+                          fat_g: 11,
+                        },
+                      ],
+                      confidence: 'high',
+                      warnings: [],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+  );
+
+  const result = await service.analyze({
+    bytes: jpegBytes,
+    mimeType: 'image/jpeg',
+    userId: 'verified-user',
+    recordUsage: async () => {
+      throw new Error('AI usage log failed (503)');
+    },
+  });
+
+  assert.equal(result.food_name, 'Chicken burger');
+  assert.equal(result.total.calories, 300);
 });
