@@ -81,6 +81,10 @@ import {
   type ActivityRepository,
 } from './services/activity-repository.js';
 import {
+  createActivityImageService,
+  type ActivityImageService,
+} from './services/activity-image-service.js';
+import {
   createAiUsageRepository,
   type AiUsageRepository,
   type RecordAiUsage,
@@ -119,6 +123,7 @@ interface AppDependencies {
   weeklyReportRepository?: WeeklyReportRepository;
   settingsRepository?: SettingsRepository;
   activityRepository?: ActivityRepository;
+  activityImageService?: ActivityImageService;
   nutritionAnalysisService?: NutritionAnalysisService;
   physiqueAnalysisService?: PhysiqueAnalysisService;
   aiUsageRepository?: AiUsageRepository;
@@ -150,6 +155,8 @@ export async function buildApp(
     dependencies.settingsRepository ?? createSettingsRepository(env);
   const activityRepository =
     dependencies.activityRepository ?? createActivityRepository(env);
+  const activityImageService =
+    dependencies.activityImageService ?? createActivityImageService(env);
   const nutritionAnalysisService =
     dependencies.nutritionAnalysisService ??
     createNutritionAnalysisService(env);
@@ -206,6 +213,7 @@ export async function buildApp(
     weeklyReportRepository,
     settingsRepository,
     activityRepository,
+    activityImageService,
     nutritionAnalysisService,
     physiqueAnalysisService,
     usageRecorder,

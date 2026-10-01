@@ -85,6 +85,7 @@ export default function ProtectedLayout() {
           />
           <Tabs.Screen name="add-food" options={{ href: null }} />
           <Tabs.Screen name="food-scanner" options={{ href: null }} />
+          <Tabs.Screen name="import-run" options={{ href: null }} />
           <Tabs.Screen name="settings/[section]" options={{ href: null }} />
           <Tabs.Screen name="nutrition-analysis" options={{ href: null }} />
         </Tabs>

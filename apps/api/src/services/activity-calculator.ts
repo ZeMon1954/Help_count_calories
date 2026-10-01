@@ -83,3 +83,51 @@ export function calculateActivity(
     calories: Math.round(calories * 100) / 100,
   };
 }
+
+// Running MET by speed (km/h), from the 2011 Compendium of Physical Activities.
+// Calories scale with how fast the run was, not just how long it lasted.
+const RUN_MET_BY_SPEED_KMH: readonly (readonly [number, number])[] = [
+  [4.8, 3.5],
+  [6.4, 6.0],
+  [8.0, 8.3],
+  [9.7, 9.8],
+  [11.3, 11.0],
+  [12.9, 11.8],
+  [14.5, 12.8],
+  [16.1, 14.5],
+  [19.3, 19.0],
+  [22.5, 23.0],
+];
+
+export function runMetForSpeed(speedKmh: number) {
+  const table = RUN_MET_BY_SPEED_KMH;
+  if (speedKmh <= table[0]![0]) return table[0]![1];
+  for (let index = 1; index < table.length; index += 1) {
+    const [upperSpeed, upperMet] = table[index]!;
+    if (speedKmh > upperSpeed) continue;
+    const [lowerSpeed, lowerMet] = table[index - 1]!;
+    return (
+      lowerMet +
+      ((speedKmh - lowerSpeed) / (upperSpeed - lowerSpeed)) *
+        (upperMet - lowerMet)
+    );
+  }
+  return table.at(-1)![1];
+}
+
+/** Summary of a run recorded by another app (distance + moving time only). */
+export function calculateImportedRun(
+  distanceM: number,
+  durationSeconds: number,
+  weightKg = 70,
+) {
+  const speedMps = distanceM / durationSeconds;
+  const met = runMetForSpeed(speedMps * 3.6);
+  const calories = met * Math.max(30, weightKg) * (durationSeconds / 3600);
+  return {
+    met: Math.round(met * 100) / 100,
+    averageSpeedMps: Math.round(speedMps * 1000) / 1000,
+    averagePaceSecondsPerKm: Math.round(durationSeconds / (distanceM / 1000)),
+    calories: Math.round(calories * 100) / 100,
+  };
+}

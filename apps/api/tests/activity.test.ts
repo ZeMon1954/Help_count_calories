@@ -7,7 +7,16 @@ import {
   createActivityRepository,
   type ActivityRepository,
 } from '../src/services/activity-repository.js';
-import { calculateActivity } from '../src/services/activity-calculator.js';
+import {
+  calculateActivity,
+  calculateImportedRun,
+  runMetForSpeed,
+} from '../src/services/activity-calculator.js';
+import {
+  ActivityImageError,
+  createActivityImageService,
+  type ActivityImageService,
+} from '../src/services/activity-image-service.js';
 
 const record = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -32,6 +41,15 @@ function repository(): ActivityRepository {
     route: async () => [{ latitude: 13.7, longitude: 100.5 }],
     totals: async () => ({ calories: 0, distanceM: 0, movingSeconds: 0 }),
     appendPoints: async ({ points }) => points.length,
+    importRun: async ({ distanceM, durationSeconds, endedAt }) => ({
+      ...record,
+      status: 'completed',
+      endedAt: endedAt.toISOString(),
+      distanceM,
+      elapsedSeconds: durationSeconds,
+      movingSeconds: durationSeconds,
+      calories: 123,
+    }),
     setStatus: async ({ status }) => ({ ...record, status }),
     finish: async () => ({
       ...record,
@@ -374,4 +392,141 @@ test('route endpoint validates the id and returns 404 for unknown activities', a
   );
   await app.close();
   await missing.close();
+});
+
+test('imported run calories scale with speed and body weight', () => {
+  // 5 km in 30 min = 10 km/h, 70 kg: MET interpolates between 9.8 and 11.0.
+  const run = calculateImportedRun(5_000, 30 * 60, 70);
+  assert.equal(run.averagePaceSecondsPerKm, 360);
+  assert.ok(run.met > 9.8 && run.met < 11);
+  assert.ok(Math.abs(run.calories - run.met * 70 * 0.5) < 0.5);
+  assert.ok(calculateImportedRun(5_000, 30 * 60, 90).calories > run.calories);
+  // Same time, longer distance (faster) burns more.
+  assert.ok(calculateImportedRun(6_000, 30 * 60, 70).calories > run.calories);
+  assert.equal(runMetForSpeed(1), 3.5);
+  assert.equal(runMetForSpeed(99), 23);
+  assert.equal(runMetForSpeed(8.0), 8.3);
+});
+
+test('importing a run saves server-computed values and validates input', async () => {
+  const headers = { authorization: 'Bearer token' };
+  const app = await buildApp(loadEnv({ NODE_ENV: 'test' }), dependencies());
+  const ok = await app.inject({
+    method: 'POST',
+    url: '/api/activities/import',
+    headers,
+    payload: { distance_m: 5_000, duration_seconds: 1_800 },
+  });
+  assert.equal(ok.statusCode, 201);
+  assert.equal(ok.json().distanceM, 5_000);
+  for (const payload of [
+    { distance_m: 5_000, duration_seconds: 10 },
+    { distance_m: 50_000, duration_seconds: 600 },
+    { distance_m: 5_000, duration_seconds: 1_800, calories: 9_999 },
+    {
+      distance_m: 5_000,
+      duration_seconds: 1_800,
+      ended_at: '2999-01-01T00:00:00.000Z',
+    },
+  ])
+    assert.equal(
+      (await app.inject({ method: 'POST', url: '/api/activities/import', headers, payload })).statusCode,
+      400,
+    );
+  assert.equal(
+    (await app.inject({ method: 'POST', url: '/api/activities/import', payload: {} })).statusCode,
+    401,
+  );
+  await app.close();
+});
+
+test('importRun stores a completed run with calories from the latest weight', async () => {
+  let saved: Record<string, unknown> | undefined;
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url = String(input);
+    if (url.includes('body_measurements?select='))
+      return new Response(JSON.stringify([{ weight_kg: 80 }]), { status: 200 });
+    if (init?.method === 'POST') {
+      saved = JSON.parse(String(init.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify([{ id: record.id, ...saved }]), { status: 201 });
+    }
+    throw new Error(`Unexpected request ${url}`);
+  };
+  const repo = createActivityRepository(
+    loadEnv({ NODE_ENV: 'test', SUPABASE_URL: 'https://example.supabase.co', SUPABASE_ANON_KEY: 'anon' }),
+    fetchImpl,
+  );
+  const endedAt = new Date('2026-09-30T10:00:00.000Z');
+  const result = await repo.importRun({
+    userId: 'u', token: 't', distanceM: 5_000, durationSeconds: 1_800, endedAt,
+  });
+  assert.equal(saved?.status, 'completed');
+  assert.equal(saved?.started_at, '2026-09-30T09:30:00.000Z');
+  assert.equal(saved?.ended_at, endedAt.toISOString());
+  assert.equal(result.calories, calculateImportedRun(5_000, 1_800, 80).calories);
+});
+
+const png = Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  Buffer.alloc(16),
+]);
+function multipart(bytes: Buffer, field = 'image', type = 'image/png') {
+  const boundary = 'xBOUNDARYx';
+  return {
+    headers: { authorization: 'Bearer token', 'content-type': `multipart/form-data; boundary=${boundary}` },
+    payload: Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="${field}"; filename="run.png"\r\nContent-Type: ${type}\r\n\r\n`,
+      ),
+      bytes,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]),
+  };
+}
+
+test('screenshot analysis returns extracted values and maps AI errors', async () => {
+  const service: ActivityImageService = {
+    analyze: async () => ({ distance_m: 5_120, duration_seconds: 1_805, confidence: 'high', warnings: [] }),
+  };
+  const app = await buildApp(loadEnv({ NODE_ENV: 'test' }), { ...dependencies(), activityImageService: service });
+  const ok = await app.inject({ method: 'POST', url: '/api/activities/screenshot-analysis', ...multipart(png) });
+  assert.equal(ok.statusCode, 200, ok.body);
+  assert.equal(ok.json().distance_m, 5_120);
+  const wrongType = await app.inject({ method: 'POST', url: '/api/activities/screenshot-analysis', ...multipart(Buffer.from('not an image'), 'image', 'image/png') });
+  assert.equal(wrongType.statusCode, 415);
+  const wrongField = await app.inject({ method: 'POST', url: '/api/activities/screenshot-analysis', ...multipart(png, 'file') });
+  assert.equal(wrongField.statusCode, 400);
+  await app.close();
+
+  const notRun = await buildApp(loadEnv({ NODE_ENV: 'test' }), {
+    ...dependencies(),
+    activityImageService: { analyze: async () => { throw new ActivityImageError('not_activity'); } },
+  });
+  const rejected = await notRun.inject({ method: 'POST', url: '/api/activities/screenshot-analysis', ...multipart(png) });
+  assert.equal(rejected.statusCode, 422);
+  assert.equal(rejected.json().code, 'NOT_RUN_SUMMARY');
+  await notRun.close();
+});
+
+test('Gemini run summary is converted to metres and rejects non-run images', async () => {
+  const env = loadEnv({ NODE_ENV: 'test', GEMINI_API_KEY: 'key' });
+  const reply = (payload: unknown): typeof fetch => async () =>
+    new Response(
+      JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }] }),
+      { status: 200 },
+    );
+  const input = { bytes: png, mimeType: 'image/png' as const };
+  const parsed = await createActivityImageService(
+    env,
+    reply({ is_run_summary: true, distance_km: 5.12, duration_seconds: 1805.4, confidence: 'medium', warnings: [] }),
+  ).analyze(input);
+  assert.equal(parsed.distance_m, 5_120);
+  assert.equal(parsed.duration_seconds, 1_805);
+  await assert.rejects(
+    createActivityImageService(
+      env,
+      reply({ is_run_summary: false, distance_km: 0, duration_seconds: 0, confidence: 'low', warnings: [] }),
+    ).analyze(input),
+    { code: 'not_activity' },
+  );
 });

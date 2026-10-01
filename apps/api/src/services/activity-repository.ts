@@ -1,6 +1,6 @@
 import type { Env } from '../config/env.js';
 import type { ActivityPointInput, ActivityType } from '../schemas/activity.js';
-import { calculateActivity } from './activity-calculator.js';
+import { calculateActivity, calculateImportedRun } from './activity-calculator.js';
 
 export interface ActivityRecord {
   id: string;
@@ -51,6 +51,13 @@ export interface ActivityRepository {
     activityId: string;
     points: ActivityPointInput[];
   }): Promise<number>;
+  importRun(input: {
+    userId: string;
+    token: string;
+    distanceM: number;
+    durationSeconds: number;
+    endedAt: Date;
+  }): Promise<ActivityRecord>;
   setStatus(input: {
     userId: string;
     token: string;
@@ -135,6 +142,7 @@ export function createActivityRepository(
       route: unavailable,
       totals: unavailable,
       appendPoints: unavailable,
+      importRun: unavailable,
       setStatus: unavailable,
       finish: unavailable,
     };
@@ -197,6 +205,13 @@ export function createActivityRepository(
       if (chunk.length < POINT_PAGE_SIZE) break;
     }
     return rows;
+  };
+  const latestWeightKg = async (userId: string, token: string) => {
+    const weights = await request<Record<string, unknown>[]>(
+      `body_measurements?select=weight_kg&user_id=eq.${encodeURIComponent(userId)}&order=recorded_at.desc&limit=1`,
+      token,
+    );
+    return weights[0] ? numeric(weights[0].weight_kg) : 70;
   };
   return {
     async create({ userId, token, type }) {
@@ -286,6 +301,42 @@ export function createActivityRepository(
       });
       return points.length;
     },
+    async importRun({ userId, token, distanceM, durationSeconds, endedAt }) {
+      const summary = calculateImportedRun(
+        distanceM,
+        durationSeconds,
+        await latestWeightKg(userId, token),
+      );
+      const rows = await request<Record<string, unknown>[]>(
+        'activities',
+        token,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            activity_type: 'run',
+            status: 'completed',
+            started_at: new Date(
+              endedAt.getTime() - durationSeconds * 1000,
+            ).toISOString(),
+            ended_at: endedAt.toISOString(),
+            updated_at: endedAt.toISOString(),
+            elapsed_seconds: durationSeconds,
+            moving_seconds: durationSeconds,
+            distance_m: distanceM,
+            average_speed_mps: summary.averageSpeedMps,
+            average_pace_seconds_per_km: summary.averagePaceSecondsPerKm,
+            calories: summary.calories,
+          }),
+        },
+      );
+      if (!rows[0]) throw new ActivityRepositoryError(502, 'POST');
+      return mapActivity(rows[0]);
+    },
     async setStatus({ userId, token, activityId, status }) {
       const current = await request<Record<string, unknown>[]>(
         `activities?select=status,elapsed_seconds,updated_at&id=eq.${encodeURIComponent(activityId)}&user_id=eq.${encodeURIComponent(userId)}&status=in.(in_progress,paused)&limit=1`,
@@ -334,10 +385,7 @@ export function createActivityRepository(
         activityId,
         token,
       );
-      const weights = await request<Record<string, unknown>[]>(
-        `body_measurements?select=weight_kg&user_id=eq.${encodeURIComponent(userId)}&order=recorded_at.desc&limit=1`,
-        token,
-      );
+      const weightKg = await latestWeightKg(userId, token);
       const inputs: ActivityPointInput[] = points.map((point) => ({
         sequence: numeric(point.sequence),
         recorded_at: String(point.recorded_at),
@@ -350,7 +398,7 @@ export function createActivityRepository(
       const summary = calculateActivity(
         activities[0]!.activity_type as ActivityType,
         inputs,
-        weights[0] ? numeric(weights[0].weight_kg) : 70,
+        weightKg,
       );
       const trackedElapsedSeconds =
         numeric(activities[0].elapsed_seconds) +

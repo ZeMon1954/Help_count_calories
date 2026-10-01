@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -213,6 +214,18 @@ export default function ActivityScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Runs imported from a screenshot are saved on another screen, so refresh
+  // the history whenever this tab regains focus.
+  const accessToken = session?.access_token;
+  useFocusEffect(
+    useCallback(() => {
+      if (!accessToken) return;
+      void fetchActivities(accessToken)
+        .then(setHistory)
+        .catch(() => {});
+    }, [accessToken]),
+  );
 
   useEffect(() => {
     if (!active) {
@@ -669,8 +682,18 @@ export default function ActivityScreen() {
               </PressScale>
 
               <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/import-run')}
+                className="mt-4 items-center rounded-full border border-white/10 py-3"
+              >
+                <Text className="text-sm font-semibold text-slate-200">
+                  นำเข้าการวิ่งจาก Strava (รูปภาพ)
+                </Text>
+              </Pressable>
+
+              <Pressable
                 onPress={() => setShowHistory(true)}
-                className="mt-5 items-center py-2"
+                className="mt-3 items-center py-2"
               >
                 <Text className="text-sm font-semibold text-slate-400">
                   ดูประวัติกิจกรรมล่าสุด

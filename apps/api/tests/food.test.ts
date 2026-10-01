@@ -99,6 +99,7 @@ const dependencies = (foodRepository: FoodRepository) => ({
     async route() { return []; },
     async totals() { return { calories: 320, distanceM: 5000, movingSeconds: 1800 }; },
     async appendPoints() { return 0; },
+    async importRun() { throw new Error('unused'); },
     async setStatus() { return null; },
     async finish() { return null; },
   },

@@ -1,7 +1,11 @@
 import type { Env } from '../config/env.js';
 
 export interface AiUsageEvent {
-  feature: 'food_analysis' | 'physique_analysis' | 'nutrition_analysis';
+  feature:
+    | 'food_analysis'
+    | 'physique_analysis'
+    | 'nutrition_analysis'
+    | 'activity_analysis';
   model: string;
   requestCount: number;
   outcome: 'success' | 'quota_exceeded' | 'provider_error' | 'timeout' | 'invalid_response';

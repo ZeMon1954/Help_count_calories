@@ -26,5 +26,30 @@ export const appendActivityPointsSchema = z
   .object({ points: z.array(activityPointSchema).min(1).max(100) })
   .strict();
 
+// A run imported from another app (e.g. a Strava screenshot) only carries
+// distance and moving time; the server derives pace and calories from them.
+export const importRunSchema = z
+  .object({
+    distance_m: z.number().finite().min(100).max(100_000),
+    duration_seconds: z.number().int().min(60).max(86_400),
+    ended_at: z.iso.datetime({ offset: true }).optional(),
+  })
+  .strict()
+  .refine((value) => value.distance_m / value.duration_seconds <= 12, {
+    message: 'Speed is not realistic for a run',
+    path: ['duration_seconds'],
+  });
+
+export const aiRunSummarySchema = z
+  .object({
+    is_run_summary: z.boolean(),
+    distance_km: z.number().finite().min(0).max(1_000),
+    duration_seconds: z.number().finite().min(0).max(172_800),
+    confidence: z.enum(['low', 'medium', 'high']),
+    warnings: z.array(z.string().trim().min(1).max(300)).max(8),
+  })
+  .strict();
+
 export type ActivityType = z.infer<typeof activityTypeSchema>;
 export type ActivityPointInput = z.infer<typeof activityPointSchema>;
+export type ImportRunInput = z.infer<typeof importRunSchema>;

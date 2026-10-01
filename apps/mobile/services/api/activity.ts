@@ -1,4 +1,9 @@
+import { fetch as expoFetch } from 'expo/fetch';
+import { File } from 'expo-file-system';
+import { Platform } from 'react-native';
+
 import { apiRequest } from './client';
+import type { LocalImage } from './food-analysis';
 
 export type ActivityType = 'walk' | 'run' | 'cycle';
 export interface ActivityRecord {
@@ -97,6 +102,45 @@ export async function finishActivity(token: string, id: string) {
       method: 'POST',
       headers: headers(token),
       body: '{}',
+    })
+  ).data;
+}
+
+export interface RunScreenshotResult {
+  distance_m: number;
+  duration_seconds: number;
+  confidence: 'low' | 'medium' | 'high';
+  warnings: string[];
+}
+export async function analyzeRunScreenshot(token: string, image: LocalImage) {
+  const form = new FormData();
+  if (Platform.OS === 'web') {
+    const response = await fetch(image.uri);
+    form.append('image', await response.blob(), image.fileName);
+  } else {
+    form.append('image', new File(image.uri), image.fileName);
+  }
+  return (
+    await apiRequest<RunScreenshotResult>(
+      'activities/screenshot-analysis',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      },
+      Platform.OS === 'web' ? fetch : (expoFetch as typeof fetch),
+    )
+  ).data;
+}
+export async function importRun(
+  token: string,
+  input: { distance_m: number; duration_seconds: number; ended_at?: string },
+) {
+  return (
+    await apiRequest<ActivityRecord>('activities/import', {
+      method: 'POST',
+      headers: headers(token),
+      body: JSON.stringify(input),
     })
   ).data;
 }

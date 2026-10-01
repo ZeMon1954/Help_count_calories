@@ -8,6 +8,7 @@ import type { FoodAnalysisService } from '../services/food-analysis-service.js';
 import type { ProgressRepository } from '../services/progress-repository.js';
 import type { SettingsRepository } from '../services/settings-repository.js';
 import type { ActivityRepository } from '../services/activity-repository.js';
+import type { ActivityImageService } from '../services/activity-image-service.js';
 import type { NutritionAnalysisService } from '../services/nutrition-analysis-service.js';
 import type { PhysiqueAnalysisService } from '../services/physique-analysis-service.js';
 import type { RecordAiUsage } from '../services/ai-usage-repository.js';
@@ -26,6 +27,7 @@ export interface RouteContext {
   weeklyReportRepository: WeeklyReportRepository;
   settingsRepository: SettingsRepository;
   activityRepository: ActivityRepository;
+  activityImageService: ActivityImageService;
   nutritionAnalysisService: NutritionAnalysisService;
   physiqueAnalysisService: PhysiqueAnalysisService;
   usageRecorder: (userId: string, accessToken: string) => RecordAiUsage;
