@@ -9,6 +9,27 @@ body,
   min-height: 100%;
 }
 
+html {
+  background: #f3f8f5;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(16, 185, 129, 0.2);
+}
+
 #root {
   display: flex;
 }

@@ -119,16 +119,6 @@ export default function ProfileScreen() {
 
       <SectionHeader title="การตั้งค่า" />
       <Card>
-        <Pressable
-          accessibilityRole="button"
-          className="min-h-16 justify-center"
-          onPress={() => router.push('/nutrition-analysis')}
-        >
-          <Text className="font-bold text-emerald-700">AI วิเคราะห์โภชนาการ</Text>
-          <Text className="mt-1 text-sm text-slate-500">คำนวณแคลอรี โปรตีน คาร์บ และไขมันที่เหมาะกับคุณ</Text>
-        </Pressable>
-      </Card>
-      <Card>
         {settings.map((item) => (
           <Pressable
             key={item.section}

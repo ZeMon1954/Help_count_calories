@@ -18,7 +18,7 @@ export function Screen({
 }: ScreenProps) {
   const content = (
     <View
-      className={`mx-auto w-full max-w-2xl gap-5 ${scroll ? '' : 'flex-1 px-4 pb-0 pt-4 sm:px-6 sm:pt-6'}`}
+      className={`mx-auto w-full max-w-3xl gap-5 ${scroll ? '' : 'flex-1 px-4 pb-0 pt-4 sm:px-6 sm:pt-6'}`}
     >
       <View className="flex-row flex-wrap items-start justify-between gap-3">
         <View className="min-w-0 flex-1 gap-1.5">
@@ -26,7 +26,9 @@ export function Screen({
             {title}
           </Text>
           {subtitle ? (
-            <Text className="text-[15px] font-medium leading-6 text-slate-500">{subtitle}</Text>
+            <Text className="text-[15px] font-medium leading-6 text-slate-500">
+              {subtitle}
+            </Text>
           ) : null}
         </View>
         {action}
@@ -36,12 +38,15 @@ export function Screen({
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      className="flex-1 bg-[#f3f8f5]"
+      edges={['top', 'left', 'right']}
+    >
       {scroll ? (
-        <ScrollView 
+        <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerClassName="flex-grow px-4 pb-32 pt-4 sm:px-6 sm:pt-6"
+          contentContainerClassName="flex-grow px-4 pb-32 pt-5 sm:px-6 sm:pt-8"
         >
           {content}
         </ScrollView>

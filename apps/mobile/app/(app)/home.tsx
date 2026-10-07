@@ -90,9 +90,11 @@ export default function HomeScreen() {
         />
       ) : (
         <>
-          <View className="overflow-hidden rounded-3xl bg-slate-900 p-6 shadow-xl shadow-slate-900/20">
-            <Text className="text-sm font-semibold tracking-wide text-slate-400 uppercase">
-              {remaining === null ? 'พลังงานที่บริโภค' : 'พลังงานคงเหลือ (kcal)'}
+          <View className="overflow-hidden rounded-3xl bg-emerald-950 p-6 shadow-xl shadow-emerald-950/20">
+            <Text className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+              {remaining === null
+                ? 'พลังงานที่บริโภค'
+                : 'พลังงานคงเหลือ (kcal)'}
             </Text>
             <View className="mt-2 flex-row items-baseline gap-2">
               <Text className="text-5xl font-extrabold tracking-tighter text-white">
@@ -132,7 +134,8 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 <Text className="mt-3 text-xs leading-4 text-slate-500">
-                  แคลอรีจากกิจกรรมเป็นค่าประมาณ และไม่ถูกนำมาบวกเพิ่มในโควตาการกินเพื่อป้องกันการนับซ้ำกับระดับกิจกรรม
+                  แคลอรีจากกิจกรรมเป็นค่าประมาณ
+                  และไม่ถูกนำมาบวกเพิ่มในโควตาการกินเพื่อป้องกันการนับซ้ำกับระดับกิจกรรม
                 </Text>
               </View>
             ) : (
@@ -145,9 +148,27 @@ export default function HomeScreen() {
           <Card>
             {(
               [
-                ['โปรตีน', consumed.protein_g, summary?.targets.protein_g, 'bg-rose-50 border-rose-100 text-rose-600', 'text-rose-900'],
-                ['คาร์บ', consumed.carbs_g, summary?.targets.carbs_g, 'bg-amber-50 border-amber-100 text-amber-600', 'text-amber-900'],
-                ['ไขมัน', consumed.fat_g, summary?.targets.fat_g, 'bg-blue-50 border-blue-100 text-blue-600', 'text-blue-900'],
+                [
+                  'โปรตีน',
+                  consumed.protein_g,
+                  summary?.targets.protein_g,
+                  'bg-rose-50 border-rose-100 text-rose-600',
+                  'text-rose-900',
+                ],
+                [
+                  'คาร์บ',
+                  consumed.carbs_g,
+                  summary?.targets.carbs_g,
+                  'bg-amber-50 border-amber-100 text-amber-600',
+                  'text-amber-900',
+                ],
+                [
+                  'ไขมัน',
+                  consumed.fat_g,
+                  summary?.targets.fat_g,
+                  'bg-blue-50 border-blue-100 text-blue-600',
+                  'text-blue-900',
+                ],
               ] as const
             ).map(([label, value, target, , textDarkClass]) => (
               <View
@@ -155,15 +176,18 @@ export default function HomeScreen() {
                 className="flex-row items-center justify-between gap-3 border-b border-slate-100 py-3 last:border-b-0"
               >
                 <View className="min-w-0 flex-1">
-                  <Text className={`text-sm font-bold ${textDarkClass}`}>{label}</Text>
+                  <Text className={`text-sm font-bold ${textDarkClass}`}>
+                    {label}
+                  </Text>
                   <Text className="mt-0.5 text-xs text-slate-500">
-                  {target === null || target === undefined
-                    ? 'ไม่มีเป้า'
-                    : `เป้า ${target}g`}
+                    {target === null || target === undefined
+                      ? 'ไม่มีเป้า'
+                      : `เป้า ${target}g`}
                   </Text>
                 </View>
                 <Text className={`text-xl font-black ${textDarkClass}`}>
-                  {Math.round(value as number)}<Text className="text-sm font-bold"> g</Text>
+                  {Math.round(value as number)}
+                  <Text className="text-sm font-bold"> g</Text>
                 </Text>
               </View>
             ))}
@@ -175,19 +199,23 @@ export default function HomeScreen() {
       <View className="gap-3 sm:flex-row">
         <Pressable
           accessibilityRole="button"
-          className="min-h-[88px] flex-1 justify-center rounded-3xl bg-primary-600 p-5 shadow-lg shadow-primary-600/30 active:scale-[0.98]"
+          className="bg-primary-600 shadow-primary-600/30 min-h-[88px] flex-1 justify-center rounded-3xl p-5 shadow-lg active:scale-[0.98]"
           onPress={() => router.push('/add-food')}
         >
           <Text className="text-lg font-bold text-white">ค้นหาอาหาร</Text>
-          <Text className="mt-1 text-sm font-medium text-primary-100">จากฐานข้อมูล</Text>
+          <Text className="text-primary-100 mt-1 text-sm font-medium">
+            จากฐานข้อมูล
+          </Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          className="min-h-[88px] flex-1 justify-center rounded-3xl bg-slate-900 p-5 shadow-lg shadow-slate-900/30 active:scale-[0.98]"
+          className="min-h-[88px] flex-1 justify-center rounded-3xl bg-amber-400 p-5 shadow-lg shadow-amber-500/20 active:scale-[0.98]"
           onPress={() => router.push('/food-scanner')}
         >
-          <Text className="text-lg font-bold text-white">สแกนอาหาร</Text>
-          <Text className="mt-1 text-sm font-medium text-slate-400">ด้วย AI</Text>
+          <Text className="text-lg font-bold text-amber-950">สแกนอาหาร</Text>
+          <Text className="mt-1 text-sm font-medium text-amber-800">
+            ด้วย AI
+          </Text>
         </Pressable>
       </View>
 
@@ -206,12 +234,15 @@ export default function HomeScreen() {
               key={item.id}
               className="flex-row items-center justify-between border-b border-slate-100 py-4 last:border-b-0"
             >
-              <View className="flex-row items-center gap-4 flex-1 pr-4">
+              <View className="flex-1 flex-row items-center gap-4 pr-4">
                 <View className="h-10 w-10 items-center justify-center rounded-full bg-slate-100">
                   <Text className="text-lg">🍽️</Text>
                 </View>
                 <View className="min-w-0 flex-1">
-                  <Text className="text-base font-bold text-slate-900" numberOfLines={2}>
+                  <Text
+                    className="text-base font-bold text-slate-900"
+                    numberOfLines={2}
+                  >
                     {item.food_name}
                   </Text>
                   <Text className="mt-0.5 text-sm font-medium text-slate-500">
@@ -221,7 +252,7 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               </View>
-              <Text className="flex-shrink-0 text-base font-extrabold text-primary-600">
+              <Text className="text-primary-600 flex-shrink-0 text-base font-extrabold">
                 {Math.round(item.calories)} kcal
               </Text>
             </View>
@@ -233,7 +264,6 @@ export default function HomeScreen() {
           description="ฐานข้อมูลของวันนี้ยังว่าง การเพิ่มลงไดอารีรอ atomic RPC"
         />
       )}
-
     </Screen>
   );
 }

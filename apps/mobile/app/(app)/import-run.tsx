@@ -33,7 +33,7 @@ import {
 
 const errorMessages: Record<string, string> = {
   NOT_RUN_SUMMARY:
-    'ไม่พบระยะทางและเวลาในรูป กรุณาใช้รูปหน้าสรุปการวิ่งจาก Strava หรือกรอกเอง',
+    'ไม่พบระยะทางและเวลาในรูป กรุณาใช้รูปหน้าสรุปจากแอปวิ่ง หรือกรอกเอง',
   IMAGE_TOO_LARGE: 'รูปมีขนาดใหญ่เกิน 8 MB กรุณาเลือกรูปอื่น',
   UNSUPPORTED_IMAGE_TYPE: 'รองรับเฉพาะรูป JPEG, PNG และ WebP',
   IMAGE_CONTENT_MISMATCH: 'ไฟล์รูปไม่ตรงกับชนิดไฟล์ กรุณาเลือกรูปใหม่',
@@ -70,7 +70,9 @@ async function optimizedImage(
         context.resize({ width: MAX_IMAGE_SIDE });
       else context.resize({ height: MAX_IMAGE_SIDE });
     }
-    const saved = await (await context.renderAsync()).saveAsync({
+    const saved = await (
+      await context.renderAsync()
+    ).saveAsync({
       compress: 0.6,
       format: SaveFormat.JPEG,
     });
@@ -206,7 +208,7 @@ export default function ImportRunScreen() {
   const busy = analyzing || saving;
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-950">
+    <SafeAreaView className="flex-1 bg-[#f3f8f5]">
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -220,16 +222,16 @@ export default function ImportRunScreen() {
             className="min-h-11 justify-center"
             onPress={() => router.replace('/activity')}
           >
-            <Text className="font-semibold text-white">‹ กลับ</Text>
+            <Text className="font-semibold text-emerald-700">‹ กลับ</Text>
           </Pressable>
 
           <View>
-            <Text className="text-3xl font-bold text-white">
-              นำเข้าการวิ่งจาก Strava
+            <Text className="text-3xl font-extrabold tracking-tight text-slate-950">
+              เพิ่มผลการวิ่งจากรูป
             </Text>
-            <Text className="mt-2 leading-5 text-slate-400">
-              เลือกรูปหน้าสรุปการวิ่งจาก Strava
-              ระบบจะอ่านระยะทางและเวลา แล้วคำนวณแคลอรี่จากน้ำหนักตัวและความเร็วของคุณ
+            <Text className="mt-2 leading-6 text-slate-500">
+              เลือกรูปหน้าสรุปจาก Strava, Garmin, Nike Run Club หรือแอปวิ่งอื่น
+              ระบบจะอ่านระยะทางและเวลา แล้วคำนวณเพซและแคลอรีจากน้ำหนักตัวของคุณ
             </Text>
           </View>
 
@@ -259,7 +261,7 @@ export default function ImportRunScreen() {
               {image ? (
                 <Image
                   accessibilityLabel="รูปสรุปการวิ่งที่เลือก"
-                  className="aspect-[3/4] w-full rounded-3xl bg-slate-900"
+                  className="aspect-[3/4] w-full rounded-3xl bg-slate-200"
                   resizeMode="contain"
                   source={{ uri: image.uri }}
                 />
@@ -279,7 +281,7 @@ export default function ImportRunScreen() {
               {analyzing ? (
                 <View className="items-center gap-2">
                   <ActivityIndicator color="#10b981" />
-                  <Text className="text-sm text-slate-400">
+                  <Text className="text-sm text-slate-500">
                     อาจใช้เวลาประมาณ 10–30 วินาที
                   </Text>
                 </View>
@@ -313,7 +315,11 @@ export default function ImportRunScreen() {
                   เวลาที่วิ่ง (Moving Time)
                 </Text>
                 <View className="mt-1 flex-row gap-2">
-                  <Field label="ชั่วโมง" value={hours} onChangeText={setHours} />
+                  <Field
+                    label="ชั่วโมง"
+                    value={hours}
+                    onChangeText={setHours}
+                  />
                   <Field
                     label="นาที"
                     value={minutes}
@@ -352,10 +358,7 @@ export default function ImportRunScreen() {
               {warnings.length > 0 ? (
                 <View className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
                   {warnings.map((warning) => (
-                    <Text
-                      key={warning}
-                      className="leading-5 text-amber-800"
-                    >
+                    <Text key={warning} className="leading-5 text-amber-800">
                       • {warning}
                     </Text>
                   ))}
@@ -363,7 +366,9 @@ export default function ImportRunScreen() {
               ) : null}
 
               <ActionButton
-                label={saving ? 'กำลังคำนวณและบันทึก...' : 'คำนวณแคลอรี่และบันทึก'}
+                label={
+                  saving ? 'กำลังคำนวณและบันทึก...' : 'คำนวณแคลอรี่และบันทึก'
+                }
                 onPress={() => void save()}
                 disabled={busy}
               />

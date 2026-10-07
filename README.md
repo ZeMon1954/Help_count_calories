@@ -19,6 +19,38 @@ Copy `apps/mobile/.env.example` to `apps/mobile/.env` and `apps/api/.env.example
 
 ## Run
 
+### Web development on localhost
+
+Set the API URL in `apps/mobile/.env`:
+
+```env
+EXPO_PUBLIC_API_URL=http://localhost:3000/api
+```
+
+Open two terminals from the repository root.
+
+Terminal 1 — start the API:
+
+```bash
+npm run dev:api
+```
+
+Terminal 2 — start the web app:
+
+```bash
+npm run web --workspace @ai-fitness/mobile
+```
+
+Open `http://localhost:8081` in a browser. The progress page is available at
+`http://localhost:8081/progress`. Restart the web process after changing an
+environment variable. Press `Ctrl+C` in each terminal to stop the servers.
+
+The Expo Go QR code printed in the terminal can be ignored when developing only
+for the web. The web app still uses Expo Router and React Native Web as its web
+toolchain.
+
+### Mobile development
+
 ```bash
 npm run dev:api
 npm run dev:mobile

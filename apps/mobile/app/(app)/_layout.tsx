@@ -32,63 +32,74 @@ export default function ProtectedLayout() {
 
   return (
     <View className="flex-1">
-        <Tabs
-          screenOptions={{
-            headerShown: false,
-            tabBarActiveTintColor: '#059669',
-            tabBarInactiveTintColor: '#94a3b8',
-            tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
-            tabBarHideOnKeyboard: true,
-            tabBarStyle: {
-              minHeight: 68,
-              paddingBottom: 8,
-              paddingTop: 7,
-              borderTopColor: '#e2e8f0',
-              backgroundColor: '#ffffff',
-            },
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: '#059669',
+          tabBarInactiveTintColor: '#94a3b8',
+          tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+          tabBarHideOnKeyboard: true,
+          tabBarStyle: {
+            minHeight: 68,
+            paddingBottom: 8,
+            paddingTop: 7,
+            borderTopColor: '#d7e8df',
+            backgroundColor: '#fbfdfc',
+            shadowColor: '#064e3b',
+            shadowOpacity: 0.06,
+            shadowRadius: 12,
+          },
+        }}
+      >
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: 'วันนี้',
+            tabBarIcon: ({ color }) => (
+              <TabIcon color={color} name="home-variant-outline" />
+            ),
           }}
-        >
-          <Tabs.Screen
-            name="home"
-            options={{
-              title: 'วันนี้',
-              tabBarIcon: ({ color }) => <TabIcon color={color} name="home-variant-outline" />,
-            }}
-          />
-          <Tabs.Screen
-            name="food"
-            options={{
-              title: 'อาหาร',
-              tabBarIcon: ({ color }) => <TabIcon color={color} name="silverware-fork-knife" />,
-            }}
-          />
-          <Tabs.Screen
-            name="progress"
-            options={{
-              title: 'สถิติ',
-              tabBarIcon: ({ color }) => <TabIcon color={color} name="chart-line" />,
-            }}
-          />
-          <Tabs.Screen
-            name="activity"
-            options={{
-              title: 'กิจกรรม',
-              tabBarIcon: ({ color }) => <TabIcon color={color} name="run" />,
-            }}
-          />
-          <Tabs.Screen
-            name="profile"
-            options={{
-              title: 'โปรไฟล์',
-              tabBarIcon: ({ color }) => <TabIcon color={color} name="account-outline" />,
-            }}
-          />
-          <Tabs.Screen name="add-food" options={{ href: null }} />
-          <Tabs.Screen name="food-scanner" options={{ href: null }} />
-          <Tabs.Screen name="import-run" options={{ href: null }} />
-          <Tabs.Screen name="settings/[section]" options={{ href: null }} />
-          <Tabs.Screen name="nutrition-analysis" options={{ href: null }} />
-        </Tabs>
+        />
+        <Tabs.Screen
+          name="food"
+          options={{
+            title: 'อาหาร',
+            tabBarIcon: ({ color }) => (
+              <TabIcon color={color} name="silverware-fork-knife" />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="progress"
+          options={{
+            title: 'สถิติ',
+            tabBarIcon: ({ color }) => (
+              <TabIcon color={color} name="chart-line" />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="activity"
+          options={{
+            title: 'กิจกรรม',
+            tabBarIcon: ({ color }) => <TabIcon color={color} name="run" />,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'โปรไฟล์',
+            tabBarIcon: ({ color }) => (
+              <TabIcon color={color} name="account-outline" />
+            ),
+          }}
+        />
+        <Tabs.Screen name="add-food" options={{ href: null }} />
+        <Tabs.Screen name="food-scanner" options={{ href: null }} />
+        <Tabs.Screen name="import-run" options={{ href: null }} />
+        <Tabs.Screen name="settings/[section]" options={{ href: null }} />
+        <Tabs.Screen name="nutrition-analysis" options={{ href: null }} />
+      </Tabs>
       {state === 'loading' || state === 'error' ? (
         <View className="absolute inset-0 z-50 bg-white">
           <ProfileStateScreen

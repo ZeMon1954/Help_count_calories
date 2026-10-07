@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { Card } from '@/components/ui/Kit';
+import { ActionButton, Card } from '@/components/ui/Kit';
 import type {
   DayStatus,
   MealType,
@@ -10,7 +10,15 @@ import type {
 } from '@/services/api/weekly-report';
 
 const kcal = (value: number) => Math.round(value).toLocaleString('th-TH');
-const weekdayNames = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสฯ', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
+const weekdayNames = [
+  'จันทร์',
+  'อังคาร',
+  'พุธ',
+  'พฤหัสฯ',
+  'ศุกร์',
+  'เสาร์',
+  'อาทิตย์',
+];
 const mealLabels: Record<MealType, string> = {
   breakfast: 'เช้า',
   lunch: 'กลางวัน',
@@ -27,11 +35,23 @@ const statusView: Record<
   DayStatus,
   { label: string; badge: string; text: string } | null
 > = {
-  in_zone: { label: 'ผ่านเป้า', badge: 'bg-emerald-100', text: 'text-emerald-800' },
+  in_zone: {
+    label: 'ผ่านเป้า',
+    badge: 'bg-emerald-100',
+    text: 'text-emerald-800',
+  },
   over_budget: { label: 'กินเกิน', badge: 'bg-red-100', text: 'text-red-800' },
-  too_low: { label: 'กินน้อยไป', badge: 'bg-amber-100', text: 'text-amber-800' },
+  too_low: {
+    label: 'กินน้อยไป',
+    badge: 'bg-amber-100',
+    text: 'text-amber-800',
+  },
   today: { label: 'วันนี้', badge: 'bg-sky-100', text: 'text-sky-800' },
-  no_data: { label: 'ไม่ได้บันทึก', badge: 'bg-slate-100', text: 'text-slate-500' },
+  no_data: {
+    label: 'ไม่ได้บันทึก',
+    badge: 'bg-slate-100',
+    text: 'text-slate-500',
+  },
   no_plan: null,
   future: null,
 };
@@ -54,7 +74,9 @@ function DayRow({ day }: { day: ReportDay }) {
         </View>
         {view ? (
           <View className={`rounded-full px-2.5 py-1 ${view.badge}`}>
-            <Text className={`text-xs font-bold ${view.text}`}>{view.label}</Text>
+            <Text className={`text-xs font-bold ${view.text}`}>
+              {view.label}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -69,7 +91,9 @@ function DayRow({ day }: { day: ReportDay }) {
               <Text className="min-w-0 flex-1 text-sm text-slate-700">
                 {meal.name}
               </Text>
-              <Text className="text-sm text-slate-500">{kcal(meal.calories)}</Text>
+              <Text className="text-sm text-slate-500">
+                {kcal(meal.calories)}
+              </Text>
             </View>
           ))}
         </View>
@@ -81,12 +105,16 @@ function DayRow({ day }: { day: ReportDay }) {
         <View className="mt-2 flex-row flex-wrap gap-x-4 gap-y-1 rounded-xl bg-slate-50 px-3 py-2">
           <Text className="text-xs text-slate-500">
             กินรวม{' '}
-            <Text className="font-bold text-slate-900">{kcal(day.consumed)}</Text>
+            <Text className="font-bold text-slate-900">
+              {kcal(day.consumed)}
+            </Text>
           </Text>
           {day.budget !== null ? (
             <Text className="text-xs text-slate-500">
               งบ{' '}
-              <Text className="font-bold text-slate-900">{kcal(day.budget)}</Text>
+              <Text className="font-bold text-slate-900">
+                {kcal(day.budget)}
+              </Text>
             </Text>
           ) : null}
           {day.exerciseCalories ? (
@@ -113,7 +141,13 @@ function DayRow({ day }: { day: ReportDay }) {
   );
 }
 
-function WeekSummary({ week, hasPlan }: { week: WeekReport; hasPlan: boolean }) {
+function WeekSummary({
+  week,
+  hasPlan,
+}: {
+  week: WeekReport;
+  hasPlan: boolean;
+}) {
   const { summary } = week;
   const cell = (label: string, value: string, tone = 'text-slate-900') => (
     <View className="w-1/2 py-2 pr-2">
@@ -128,7 +162,9 @@ function WeekSummary({ week, hasPlan }: { week: WeekReport; hasPlan: boolean }) 
         {cell('บันทึกอาหาร', `${summary.daysLogged}/7 วัน`)}
         {cell(
           'กินเฉลี่ยต่อวัน',
-          summary.averageConsumed === null ? '-' : `${kcal(summary.averageConsumed)} kcal`,
+          summary.averageConsumed === null
+            ? '-'
+            : `${kcal(summary.averageConsumed)} kcal`,
         )}
         {hasPlan
           ? cell(
@@ -140,18 +176,26 @@ function WeekSummary({ week, hasPlan }: { week: WeekReport; hasPlan: boolean }) 
         {hasPlan
           ? cell(
               'ขาดสะสม',
-              summary.totalDeficit === null ? '-' : `${kcal(summary.totalDeficit)} kcal`,
+              summary.totalDeficit === null
+                ? '-'
+                : `${kcal(summary.totalDeficit)} kcal`,
               'text-emerald-700',
             )
           : null}
         {hasPlan
           ? cell(
               'น่าจะลดไป',
-              summary.estimatedLossKg === null ? '-' : `${summary.estimatedLossKg} กก.`,
+              summary.estimatedLossKg === null
+                ? '-'
+                : `${summary.estimatedLossKg} กก.`,
               'text-emerald-700',
             )
           : null}
-        {cell('ออกกำลังกาย', `${kcal(summary.exerciseCalories)} kcal`, 'text-sky-700')}
+        {cell(
+          'ออกกำลังกาย',
+          `${kcal(summary.exerciseCalories)} kcal`,
+          'text-sky-700',
+        )}
         {summary.weightChangeKg !== null
           ? cell(
               'น้ำหนักที่ชั่งจริง',
@@ -172,7 +216,7 @@ function PastWeek({ week, hasPlan }: { week: WeekReport; hasPlan: boolean }) {
   const [open, setOpen] = useState(false);
   const { summary } = week;
   return (
-    <Card>
+    <View className="border-b border-slate-100 py-4 last:border-b-0">
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
@@ -183,7 +227,7 @@ function PastWeek({ week, hasPlan }: { week: WeekReport; hasPlan: boolean }) {
             {shortDate(week.weekStart)} – {shortDate(week.weekEnd)}
           </Text>
           <Text className="text-sm font-semibold text-emerald-700">
-            {open ? 'ซ่อน' : 'ดูรายวัน'}
+            {open ? 'ซ่อน ︿' : 'ดูรายวัน ﹀'}
           </Text>
         </View>
         <Text className="mt-1 text-sm text-slate-500">
@@ -203,13 +247,13 @@ function PastWeek({ week, hasPlan }: { week: WeekReport; hasPlan: boolean }) {
         ) : null}
       </Pressable>
       {open ? (
-        <View className="mt-2">
+        <View className="mt-3 rounded-2xl bg-slate-50 px-3">
           {week.days.map((day) => (
             <DayRow key={day.date} day={day} />
           ))}
         </View>
       ) : null}
-    </Card>
+    </View>
   );
 }
 
@@ -220,35 +264,90 @@ export function WeeklyTable({
   weeks: WeekReport[];
   hasPlan: boolean;
 }) {
+  const HISTORY_PAGE_SIZE = 3;
+  const [visiblePastWeeks, setVisiblePastWeeks] = useState(HISTORY_PAGE_SIZE);
+  const [currentOpen, setCurrentOpen] = useState(false);
   const current = weeks.find((week) => week.isCurrent);
   const past = weeks.filter((week) => !week.isCurrent);
+  const visiblePast = past.slice(0, visiblePastWeeks);
+  const hasMore = visiblePastWeeks < past.length;
   return (
     <View className="gap-4">
       {current ? (
         <Card>
-          <Text className="text-lg font-extrabold text-slate-950">
-            สัปดาห์นี้
-          </Text>
-          <Text className="text-sm text-slate-500">
-            {shortDate(current.weekStart)} – {shortDate(current.weekEnd)}
-          </Text>
-          <View className="mt-2">
-            {current.days.map((day) => (
-              <DayRow key={day.date} day={day} />
-            ))}
+          <View className="flex-row items-start justify-between gap-3">
+            <View className="min-w-0 flex-1">
+              <Text className="text-lg font-extrabold text-slate-950">
+                สัปดาห์นี้
+              </Text>
+              <Text className="text-sm text-slate-500">
+                {shortDate(current.weekStart)} – {shortDate(current.weekEnd)}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: currentOpen }}
+              onPress={() => setCurrentOpen((value) => !value)}
+              className="min-h-11 justify-center"
+            >
+              <Text className="font-bold text-emerald-700">
+                {currentOpen ? 'ซ่อนรายวัน ︿' : 'ดูรายวัน ﹀'}
+              </Text>
+            </Pressable>
           </View>
           <WeekSummary week={current} hasPlan={hasPlan} />
+          {currentOpen ? (
+            <View className="mt-3 rounded-2xl bg-slate-50 px-3">
+              {current.days.map((day) => (
+                <DayRow key={day.date} day={day} />
+              ))}
+            </View>
+          ) : null}
         </Card>
       ) : null}
       {past.length ? (
-        <>
-          <Text className="text-lg font-extrabold text-slate-950">
-            สัปดาห์ก่อนหน้า
-          </Text>
-          {past.map((week) => (
-            <PastWeek key={week.weekStart} week={week} hasPlan={hasPlan} />
-          ))}
-        </>
+        <Card>
+          <View className="flex-row items-end justify-between gap-3">
+            <View className="min-w-0 flex-1">
+              <Text className="text-lg font-extrabold text-slate-950">
+                ประวัติย้อนหลัง
+              </Text>
+              <Text className="mt-0.5 text-sm text-slate-500">
+                {past.length} สัปดาห์ · แตะสัปดาห์เพื่อดูรายวัน
+              </Text>
+            </View>
+            {visiblePastWeeks > HISTORY_PAGE_SIZE ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setVisiblePastWeeks(HISTORY_PAGE_SIZE)}
+              >
+                <Text className="py-2 text-sm font-semibold text-slate-500">
+                  ย่อรายการ
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View className="mt-2">
+            {visiblePast.map((week) => (
+              <PastWeek key={week.weekStart} week={week} hasPlan={hasPlan} />
+            ))}
+          </View>
+
+          {hasMore ? (
+            <View className="mt-3">
+              <ActionButton
+                label={`ดูเพิ่มอีก ${Math.min(HISTORY_PAGE_SIZE, past.length - visiblePastWeeks)} สัปดาห์`}
+                variant="secondary"
+                onPress={() =>
+                  setVisiblePastWeeks((count) =>
+                    Math.min(count + HISTORY_PAGE_SIZE, past.length),
+                  )
+                }
+              />
+            </View>
+          ) : null}
+        </Card>
       ) : null}
     </View>
   );

@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 export function Card({ children }: PropsWithChildren) {
   return (
-    <View className="rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-sm shadow-slate-200/40 sm:p-5">
+    <View className="rounded-[24px] border border-emerald-100/70 bg-white p-4 shadow-sm shadow-emerald-950/5 sm:p-5">
       {children}
     </View>
   );
@@ -18,7 +18,12 @@ export function SectionHeader({
 }) {
   return (
     <View className="min-h-8 flex-row flex-wrap items-center justify-between gap-2">
-      <Text className="min-w-0 flex-1 text-lg font-extrabold leading-7 tracking-tight text-slate-950">{title}</Text>
+      <View className="min-w-0 flex-1 flex-row items-center gap-2.5">
+        <View className="h-5 w-1 rounded-full bg-emerald-500" />
+        <Text className="min-w-0 flex-1 text-lg font-extrabold leading-7 tracking-tight text-slate-950">
+          {title}
+        </Text>
+      </View>
       {action}
     </View>
   );
@@ -57,7 +62,7 @@ export function ActionButton({
       ? 'bg-primary-600 active:bg-primary-700'
       : variant === 'danger'
         ? 'bg-red-500 active:bg-red-600'
-        : 'border-2 border-slate-200 bg-white active:bg-slate-50';
+        : 'border-2 border-emerald-100 bg-emerald-50/60 active:bg-emerald-100';
   const textColor = variant === 'secondary' ? 'text-slate-800' : 'text-white';
   // `active:scale-*` must stay in every state. Adding a transform class only on
   // some renders makes NativeWind upgrade the component to an animated one
@@ -70,7 +75,9 @@ export function ActionButton({
       disabled={disabled}
       onPress={onPress}
     >
-      <Text className={`text-center text-base font-bold ${textColor}`}>{label}</Text>
+      <Text className={`text-center text-base font-bold ${textColor}`}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -85,8 +92,10 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <View className="items-center gap-3 rounded-[24px] border border-dashed border-slate-300 bg-white p-6">
-      <Text className="text-center text-lg font-bold text-slate-900">{title}</Text>
+    <View className="items-center gap-3 rounded-[24px] border border-dashed border-emerald-200 bg-emerald-50/40 p-6">
+      <Text className="text-center text-lg font-bold text-slate-900">
+        {title}
+      </Text>
       <Text className="text-center text-[15px] leading-6 text-slate-500">
         {description}
       </Text>
